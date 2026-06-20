@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Brazil Bet — Apostas Esportivas</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<div class="app">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="brand-mark">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4 7 11l4 3-3 6 9-7-4-3z"/></svg>
+    </div>
+    <button class="nav-item active">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 3a14 14 0 000 18M12 3a14 14 0 010 18M3.5 9h17M3.5 15h17"/></svg>
+      <span data-i18n="nav.sports">Esportes</span>
+    </button>
+    <button class="nav-item">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M5 12a7 7 0 0114 0M2 12a10 10 0 0120 0"/></svg>
+      <span data-i18n="nav.live">Ao Vivo</span>
+    </button>
+    <button class="nav-item">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+      <span data-i18n="nav.mybets">Minhas apostas</span>
+    </button>
+    <button class="nav-item">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M16 12h.01M3 10h18"/></svg>
+      <span data-i18n="nav.wallet">Carteira</span>
+    </button>
+  </aside>
+
+  <!-- Main -->
+  <div class="main">
+    <header class="topbar">
+      <div class="search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        <input type="text" data-i18n-ph="top.search" placeholder="Buscar times ou ligas" />
+      </div>
+      <div class="topbar-divider"></div>
+      <button class="btn btn-primary" onclick="openWallet()" data-i18n="top.deposit">Depositar</button>
+      <button class="lang-toggle btn-outline" onclick="toggleLang()" style="padding:9px 12px;">🇬🇧 EN</button>
+
+      <button class="icon-badge">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg>
+        <span class="count">8</span>
+      </button>
+
+      <div class="balance-block">
+        <div class="bal"><span data-i18n="top.balance">Saldo</span>: <span class="amt">R$ 250,00</span>
+          <button class="add-more" onclick="openWallet()" data-i18n="top.addmore">Adicionar</button></div>
+        <div class="escrow">PIX · 24/7</div>
+      </div>
+
+      <div class="avatar-wrap">
+        <img class="avatar" src="https://api.dicebear.com/9.x/bottts/svg?seed=BrazilBet&radius=18&backgroundColor=1b1a3d,21204a" alt="" />
+        <span class="avatar-dot"></span>
+      </div>
+    </header>
+
+    <div class="content">
+      <section class="feed">
+        <!-- League banners (real football photos; original art, no EA/FIFA marks) -->
+        <div class="banners">
+          <div class="banner active" onclick="selectLeague(this, '71')" style="background: linear-gradient(100deg,#0a5a2a 0%,#0f7d3a 55%,#23c065 100%);">
+            <div class="b-photo" style="background-image:url('https://loremflickr.com/640/240/soccer,player?lock=21')"></div>
+            <div class="b-content"><div class="b-logo">🇧🇷</div><div><div class="b-sub">Série A</div><div class="b-title">Brasileirão</div></div></div>
+          </div>
+          <div class="banner" onclick="selectLeague(this, '1')" style="background: linear-gradient(100deg,#16264f 0%,#234f86 60%,#2b6fd6 100%);">
+            <div class="b-photo" style="background-image:url('https://loremflickr.com/640/240/football,stadium?lock=22')"></div>
+            <div class="b-content"><div class="b-logo">🏆</div><div><div class="b-sub">Seleções</div><div class="b-title">Copa do Mundo</div></div></div>
+          </div>
+          <div class="banner" onclick="selectLeague(this, '13')" style="background: linear-gradient(100deg,#3a1606 0%,#7a3410 55%,#d4711f 100%);">
+            <div class="b-photo" style="background-image:url('https://loremflickr.com/640/240/soccer,fans?lock=13')"></div>
+            <div class="b-content"><div class="b-logo">🌎</div><div><div class="b-sub">CONMEBOL</div><div class="b-title">Libertadores</div></div></div>
+          </div>
+        </div>
+
+        <div class="feed-head">
+          <h1 id="feed-title">Próximas partidas</h1>
+          <span class="count" id="feed-count"></span>
+        </div>
+
+        <div class="fixtures" id="fixtures"><div class="empty">…</div></div>
+      </section>
+
+      <!-- Bet slip rail -->
+      <aside class="rail">
+        <div class="slip-head">
+          <h2 data-i18n="slip.title">Bilhete</h2>
+          <span class="cnt" id="slip-count">0</span>
+        </div>
+        <div class="slip"><div id="slip-body"></div></div>
+      </aside>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Aggressive paywall ===== -->
+<div class="paywall" id="paywall">
+  <div class="paywall-card">
+    <button class="paywall-lang lang-toggle" onclick="toggleLang()">🇬🇧 EN</button>
+    <button class="paywall-close" onclick="closePaywall()">×</button>
+    <div class="pw-lock"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="11" width="16" height="9" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg></div>
+    <h2 data-i18n="pw.title">Acesso exclusivo — pague para continuar</h2>
+    <p class="pw-sub" data-i18n="pw.sub">Assine para ver odds ao vivo e apostar.</p>
+    <div class="pw-plans">
+      <button class="pw-plan" data-plan="day" onclick="selectPlan(this)"><div class="pn" data-i18n="pw.day">Diário</div><div class="pp">R$9,90</div><div class="pper" data-i18n="pw.dayPer">/dia</div></button>
+      <button class="pw-plan active" data-plan="month" onclick="selectPlan(this)"><div class="pw-badge" data-i18n="pw.popular">POPULAR</div><div class="pn" data-i18n="pw.month">Mensal</div><div class="pp">R$49,90</div><div class="pper" data-i18n="pw.monthPer">/mês</div></button>
+      <button class="pw-plan" data-plan="year" onclick="selectPlan(this)"><div class="pn" data-i18n="pw.year">Anual VIP</div><div class="pp">R$399</div><div class="pper" data-i18n="pw.yearPer">/ano</div></button>
+    </div>
+    <div class="pw-pay-tabs">
+      <button class="pw-pay-tab active" data-pay="card" onclick="selectPay(this)" data-i18n="pw.payCard">Cartão</button>
+      <button class="pw-pay-tab" data-pay="crypto" onclick="selectPay(this)" data-i18n="pw.payCrypto">Cripto (USDT)</button>
+    </div>
+    <button class="pw-cta" id="pw-cta" onclick="submitPaywall()" data-i18n="pw.cta">Pagar agora e entrar</button>
+    <p class="pw-note demo" id="pw-note" data-i18n="pw.demo">Demonstração — pagamento simulado, nenhum valor é cobrado.</p>
+  </div>
+</div>
+
+<!-- ===== Wallet modal ===== -->
+<div class="modal-overlay" id="wallet-modal">
+  <div class="modal">
+    <div class="modal-head"><h3 data-i18n="wm.title">Carteira Cripto</h3><button class="modal-close" onclick="closeModal('wallet-modal')">×</button></div>
+    <div class="modal-body" id="wallet-body"></div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

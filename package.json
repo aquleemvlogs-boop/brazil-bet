@@ -1,0 +1,15 @@
+{
+  "name": "brazil-bet",
+  "version": "0.1.0",
+  "description": "Brazilian sports betting site with live match data",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "dotenv": "^16.4.5"
+  }
+}
