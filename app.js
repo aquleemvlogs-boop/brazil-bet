@@ -7,10 +7,14 @@
 // ---------------- i18n ----------------
 const I18N = {
   pt: {
-    'nav.sports': 'Esportes', 'nav.live': 'Ao Vivo', 'nav.mybets': 'Minhas apostas', 'nav.wallet': 'Carteira',
+    'nav.sports': 'Mercados', 'nav.live': 'Ao Vivo', 'nav.mybets': 'Portfólio', 'nav.wallet': 'Carteira',
     'top.search': 'Buscar times ou ligas', 'top.deposit': 'Depositar',
     'top.balance': 'Saldo', 'top.addmore': 'Adicionar',
-    'feed.upcoming': '{league} · Próximas partidas', 'feed.count': '{n} partidas',
+    'feed.upcoming': '{league} · Mercados', 'feed.count': '{n} mercados',
+    'mk.draw': 'Empate', 'mk.vol': 'Volume', 'mk.yes': 'Sim', 'mk.no': 'Não', 'mk.amount': 'Valor (US$)',
+    'mk.shares': 'Cotas', 'mk.sharesShort': 'cotas', 'mk.avg': 'Preço médio', 'mk.payout': 'Retorno máximo',
+    'mk.buy': 'Comprar', 'mk.pickPrompt': 'Selecione um resultado para negociar.', 'mk.noPos': 'Nenhuma posição aberta.',
+    'mk.won': 'Ganhou ✓', 'mk.lost': 'Perdeu', 'mk.q': '{o}', 'mk.trade': 'Negociar', 'mk.portfolio': 'Portfólio',
     'odds.1': '1', 'odds.X': 'X', 'odds.2': '2', 'live': 'AO VIVO', 'inplay': 'em jogo', 'final': 'Encerrado',
     'today': 'Hoje', 'tomorrow': 'Amanhã',
     'slip.title': 'Bilhete', 'slip.empty': 'Toque em uma odd para começar a apostar.',
@@ -37,10 +41,14 @@ const I18N = {
     'mock': '⚠️ Dados de exemplo para esta competição (fora de temporada). As demais ligas usam dados reais.',
   },
   en: {
-    'nav.sports': 'Sports', 'nav.live': 'Live', 'nav.mybets': 'My bets', 'nav.wallet': 'Wallet',
+    'nav.sports': 'Markets', 'nav.live': 'Live', 'nav.mybets': 'Portfolio', 'nav.wallet': 'Wallet',
     'top.search': 'Search teams or leagues', 'top.deposit': 'Deposit',
     'top.balance': 'Balance', 'top.addmore': 'Add more',
-    'feed.upcoming': '{league} · Upcoming matches', 'feed.count': '{n} matches',
+    'feed.upcoming': '{league} · Markets', 'feed.count': '{n} markets',
+    'mk.draw': 'Draw', 'mk.vol': 'Volume', 'mk.yes': 'Yes', 'mk.no': 'No', 'mk.amount': 'Amount (US$)',
+    'mk.shares': 'Shares', 'mk.sharesShort': 'shares', 'mk.avg': 'Avg price', 'mk.payout': 'Max payout',
+    'mk.buy': 'Buy', 'mk.pickPrompt': 'Select an outcome to trade.', 'mk.noPos': 'No open positions.',
+    'mk.won': 'Won ✓', 'mk.lost': 'Lost', 'mk.q': '{o}', 'mk.trade': 'Trade', 'mk.portfolio': 'Portfolio',
     'odds.1': '1', 'odds.X': 'X', 'odds.2': '2', 'live': 'LIVE', 'inplay': 'in play', 'final': 'Final',
     'today': 'Today', 'tomorrow': 'Tomorrow',
     'slip.title': 'Bet slip', 'slip.empty': 'Tap an odd to start betting.',
@@ -81,7 +89,8 @@ function setLang(l) {
   document.documentElement.lang = l === 'pt' ? 'pt-BR' : 'en';
   applyI18n();
   loadFixtures(state.league);
-  renderSlip();
+  renderTrade();
+  renderPositions();
   if (wallet.address) renderWallet();
 }
 function toggleLang() { setLang(lang === 'pt' ? 'en' : 'pt'); }
@@ -113,7 +122,7 @@ const LEAGUES = {
   '13': { label: 'Libertadores', sub: 'CONMEBOL', grad: 'linear-gradient(100deg,#3a1606 0%,#7a3410 55%,#d4711f 100%)', photo: 'https://loremflickr.com/640/240/soccer,fans?lock=13' },
 };
 
-const state = { league: '71' };
+const state = { league: '71', balance: 1000, fixtures: [] };
 
 // ---------------- real data: ESPN public API (called directly from the browser) ----------------
 // ESPN's scoreboard endpoints are CORS-enabled, so the static site fetches them
@@ -192,8 +201,9 @@ async function loadFixtures(leagueId) {
   body.innerHTML = `<div class="empty">${t('loading')}</div>`;
   try {
     const { fixtures, source } = await fetchFixtures(leagueId);
+    state.fixtures = fixtures;
     document.getElementById('feed-count').textContent = t('feed.count').replace('{n}', fixtures.length);
-    body.innerHTML = fixtures.length ? fixtures.map(fixtureRow).join('') : `<div class="empty">${t('mock')}</div>`;
+    body.innerHTML = fixtures.length ? fixtures.map(marketRow).join('') : `<div class="empty">${t('mock')}</div>`;
     if (source === 'mock') flagMock(); else clearMock();
   } catch (e) {
     console.error(e);
@@ -201,31 +211,90 @@ async function loadFixtures(leagueId) {
   }
 }
 
-function fixtureRow(f) {
+// ============================================================
+//  Prediction market — probabilities (¢), local trading, real resolution
+// ============================================================
+const FIX = {};            // fixture registry by id (for the trade panel + settlement)
+const marketState = {};    // id -> { adj:{home,draw,away} } local price pressure from trades
+const positions = [];      // open positions
+let trade = { id: null, type: null, side: 'yes', amount: 25 };
+const TRADE_IMPACT = 0.0008; // toy liquidity: probability move per $ of net YES flow
+
+function normalize(p) { const s = (p.home + p.draw + p.away) || 1; return { home: p.home / s, draw: p.draw / s, away: p.away / s }; }
+function impliedFromOdds(o) { return normalize({ home: 1 / o.home, draw: 1 / (o.draw || 50), away: 1 / o.away }); } // de-vigged
+function liveProb(f) {
+  const diff = (f.home.score || 0) - (f.away.score || 0);
+  const remain = Math.max(0, 90 - Math.min(90, f.minute || 45)) / 90;
+  const lead = Math.max(0.05, Math.min(0.95, 0.45 + diff * 0.18));
+  const draw = Math.max(0.05, 0.30 * remain + (diff === 0 ? 0.18 * remain : 0));
+  return normalize({ home: lead * (1 - draw), draw, away: (1 - lead) * (1 - draw) });
+}
+function seedProb(id) {
+  const s = String(id).split('').reduce((a, c) => a + c.charCodeAt(0), 0);
+  const r = (n) => Math.abs(Math.sin(s * 0.7 + n));
+  return normalize({ home: 0.3 + r(1) * 0.4, draw: 0.18 + r(2) * 0.12, away: 0.2 + r(3) * 0.4 });
+}
+function basePrices(f) {
+  if (f.odds) return impliedFromOdds(f.odds);          // real bookmaker odds → probability
+  if (['1H', '2H', 'HT'].includes(f.status)) return liveProb(f); // live model from score + minute
+  return seedProb(f.id);
+}
+function resolvedOutcome(f) {
+  if (!['FT', 'AET', 'PEN'].includes(f.status) || f.home.score == null || f.away.score == null) return null;
+  return f.home.score > f.away.score ? 'home' : f.away.score > f.home.score ? 'away' : 'draw';
+}
+function prices(f) {
+  const res = resolvedOutcome(f);
+  if (res) return { home: res === 'home' ? 1 : 0, draw: res === 'draw' ? 1 : 0, away: res === 'away' ? 1 : 0, resolved: res };
+  const base = basePrices(f);
+  const adj = marketState[f.id]?.adj || { home: 0, draw: 0, away: 0 };
+  const p = normalize({
+    home: Math.max(0.01, base.home + adj.home),
+    draw: Math.max(0.01, base.draw + adj.draw),
+    away: Math.max(0.01, base.away + adj.away),
+  });
+  return { ...p, resolved: null };
+}
+const cents = (x) => Math.round(x * 100);
+function volOf(id) { const s = String(id).split('').reduce((a, c) => a + c.charCodeAt(0), 0); return 3 + (s % 47) + (s % 9) / 10; }
+function outcomeName(f, type) { return type === 'draw' ? t('mk.draw') : (type === 'home' ? f.home.name : f.away.name); }
+
+function marketRow(f) {
+  FIX[f.id] = f;
   const isLive = ['1H', '2H', 'HT', 'ET', 'P', 'BT'].includes(f.status);
-  const isDone = f.status === 'FT' || f.status === 'AET' || f.status === 'PEN';
-  const showScore = isLive || isDone;
-  const o = f.odds || genOdds(f.id);
+  const isDone = ['FT', 'AET', 'PEN'].includes(f.status);
+  const p = prices(f);
   let timeHtml;
   if (isLive) timeHtml = `<span class="live">${t('live')}</span><span>${f.minute ? f.minute + "'" : f.status}</span>`;
-  else if (isDone) { const k = kickoff(f.date); timeHtml = `<span class="done">${t('final')}</span><span>${k.label}</span>`; }
+  else if (isDone) timeHtml = `<span class="done">${t('final')}</span><span>${kickoff(f.date).label}</span>`;
   else { const k = kickoff(f.date); timeHtml = `<span>${k.label}</span><span>${k.time}</span>`; }
-  const sH = showScore && f.home.score != null ? `<span class="score">${f.home.score}</span>` : '';
-  const sA = showScore && f.away.score != null ? `<span class="score">${f.away.score}</span>` : '';
-  const h = esc(f.home.name), a = esc(f.away.name), c = esc(f.league || '');
-  const odd = (type, val, label) =>
-    `<button class="odd" id="odd-${f.id}-${type}" onclick="addToSlip('${f.id}','${type}',${val},'${h}','${a}','${c}')"><span class="ol">${label}</span><span class="op">${val}</span></button>`;
+  const sH = (isLive || isDone) && f.home.score != null ? `<span class="score">${f.home.score}</span>` : '';
+  const sA = (isLive || isDone) && f.away.score != null ? `<span class="score">${f.away.score}</span>` : '';
+  const chip = (type) => {
+    const pct = cents(p[type]);
+    const sel = trade.id === f.id && trade.type === type ? ' sel' : '';
+    const cls = p.resolved === type ? ' won' : (p.resolved ? ' dim' : '');
+    const click = p.resolved ? '' : `onclick="openTrade('${f.id}','${type}')"`;
+    return `<button class="mk-out${sel}${cls}" ${click}>
+      <span class="mo-name">${esc(outcomeName(f, type))}</span><span class="mo-pct">${pct}¢</span>
+      <span class="mo-bar"><span style="width:${pct}%"></span></span></button>`;
+  };
   return `
-    <div class="fixture-row">
-      <div class="fx-time">${timeHtml}</div>
-      <div class="fx-teams">
-        <div class="fx-team">${crestHTML(f.home.name, f.home.logo)}<span>${f.home.name}</span>${sH}</div>
-        <div class="fx-team">${crestHTML(f.away.name, f.away.logo)}<span>${f.away.name}</span>${sA}</div>
+    <div class="market-row">
+      <div class="mk-head">
+        <div class="fx-time">${timeHtml}</div>
+        <div class="fx-teams">
+          <div class="fx-team">${crestHTML(f.home.name, f.home.logo)}<span>${f.home.name}</span>${sH}</div>
+          <div class="fx-team">${crestHTML(f.away.name, f.away.logo)}<span>${f.away.name}</span>${sA}</div>
+        </div>
+        <div class="mk-vol">$${volOf(f.id).toFixed(1)}k<span>${t('mk.vol')}</span></div>
       </div>
-      ${odd('home', o.home, t('odds.1'))}
-      ${odd('draw', o.draw, t('odds.X'))}
-      ${odd('away', o.away, t('odds.2'))}
+      <div class="mk-outs">${chip('home')}${chip('draw')}${chip('away')}</div>
     </div>`;
+}
+function rerenderMarkets() {
+  const body = document.getElementById('fixtures');
+  if (body && state.fixtures && state.fixtures.length) body.innerHTML = state.fixtures.map(marketRow).join('');
 }
 function esc(s) { return String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'"); }
 
@@ -243,66 +312,109 @@ function flagMock() {
 function clearMock() { const b = document.getElementById('mock-bar'); if (b) b.remove(); }
 
 // ============================================================
-//  Bet slip
+//  Trading + portfolio
 // ============================================================
-const slip = [];
-let lastStake = 50;
+function openTrade(id, type) {
+  trade = { id, type, side: 'yes', amount: trade.amount || 25 };
+  rerenderMarkets();
+  renderTrade();
+}
+function setSide(s) { trade.side = s; renderTrade(); }
+function setAmt(v) { trade.amount = v; renderTrade(); }
+function readAmt() { const el = document.getElementById('trade-amt'); if (el) trade.amount = parseFloat(el.value.replace(',', '.')) || 0; }
+function yesPrice(id, type) { const f = FIX[id]; return f ? prices(f)[type] : 0.5; }
+// Mark a position to the current market: YES pays the outcome prob, NO pays 1-prob;
+// once resolved it's $1 if correct, else $0.
+function markPrice(q) {
+  const f = FIX[q.id]; const p = f ? prices(f) : null;
+  if (!p) return q.avg;
+  if (p.resolved) return (((q.side === 'yes' && p.resolved === q.type) || (q.side === 'no' && p.resolved !== q.type)) ? 1 : 0);
+  return q.side === 'yes' ? p[q.type] : (1 - p[q.type]);
+}
 
-function addToSlip(id, pickType, odds, home, away, comp) {
-  document.querySelectorAll(`[id^="odd-${id}-"]`).forEach(b => b.classList.remove('active'));
-  const i = slip.findIndex(s => s.id === id);
-  if (i >= 0 && slip[i].pickType === pickType) { slip.splice(i, 1); renderSlip(); return; } // toggle off
-  if (i >= 0) slip.splice(i, 1);
-  slip.push({ id, pickType, odds, home, away, comp });
-  const btn = document.getElementById(`odd-${id}-${pickType}`); if (btn) btn.classList.add('active');
-  renderSlip();
+function buy() {
+  const f = FIX[trade.id]; if (!f) return;
+  const yp = yesPrice(trade.id, trade.type);
+  const price = trade.side === 'yes' ? yp : (1 - yp);          // cost per share in $
+  if (price <= 0.01 || price >= 0.99) return;
+  const amt = trade.amount || 0;
+  if (amt <= 0 || amt > state.balance) return;
+  positions.push({ id: trade.id, type: trade.type, side: trade.side, shares: amt / price, cost: amt, avg: price,
+    label: outcomeName(f, trade.type), match: `${f.home.name} ${t('vs')} ${f.away.name}` });
+  const st = marketState[trade.id] || (marketState[trade.id] = { adj: { home: 0, draw: 0, away: 0 } });
+  st.adj[trade.type] = (st.adj[trade.type] || 0) + TRADE_IMPACT * amt * (trade.side === 'yes' ? 1 : -1);
+  state.balance -= amt;
+  updateBalance();
+  rerenderMarkets();
+  renderTrade();
+  renderPositions();
 }
-function removeFromSlip(id) {
-  const i = slip.findIndex(s => s.id === id);
-  if (i >= 0) { slip.splice(i, 1); document.querySelectorAll(`[id^="odd-${id}-"]`).forEach(b => b.classList.remove('active')); renderSlip(); }
+function closePos(i) {
+  const q = positions[i]; if (!q) return;
+  state.balance += q.shares * markPrice(q);                    // cash out at current mark
+  positions.splice(i, 1);
+  updateBalance();
+  renderPositions();
 }
-function clearSlip() {
-  slip.length = 0;
-  document.querySelectorAll('.odd.active').forEach(b => b.classList.remove('active'));
-  renderSlip();
-}
-function pickLabel(s) {
-  if (s.pickType === 'draw') return t('bet.draw');
-  return t('bet.win').replace('{t}', s.pickType === 'home' ? s.home : s.away);
-}
-function readStake() { const el = document.getElementById('stake'); if (el) lastStake = parseFloat(el.value.replace(',', '.')) || 0; return lastStake; }
-function setStake(v) { lastStake = v; renderSlip(); }
+function updateBalance() { const el = document.getElementById('bal-amt'); if (el) el.textContent = '$' + state.balance.toFixed(2); }
 
-function renderSlip() {
-  const body = document.getElementById('slip-body');
-  const cnt = document.getElementById('slip-count');
-  cnt.textContent = slip.length;
-  if (!slip.length) { body.innerHTML = `<div class="slip-empty">${t('slip.empty')}</div>`; return; }
-  const sels = slip.map(s => `
-    <div class="slip-sel">
-      <div class="top">
-        <div><div class="pick">${pickLabel(s)}</div><div class="match">${s.home} ${t('vs')} ${s.away}${s.comp ? ' · ' + s.comp : ''}</div></div>
-        <button class="rm" onclick="removeFromSlip('${s.id}')">×</button>
-      </div>
-      <div class="odds">${s.odds.toFixed(2)}</div>
-    </div>`).join('');
-  const total = slip.reduce((a, s) => a * s.odds, 1);
-  const stake = readStake();
-  body.innerHTML = `
-    ${sels}
-    <div class="stake-row"><label>${t('slip.stake')}</label><input id="stake" value="${stake.toFixed(2).replace('.', ',')}" oninput="readStake();renderSlip()" /></div>
+function renderTrade() {
+  const el = document.getElementById('trade-body');
+  if (!trade.id || !FIX[trade.id]) { el.innerHTML = `<div class="slip-empty">${t('mk.pickPrompt')}</div>`; return; }
+  const f = FIX[trade.id];
+  const yp = yesPrice(trade.id, trade.type);
+  const price = trade.side === 'yes' ? yp : (1 - yp);
+  const amt = trade.amount || 0;
+  const shares = price > 0 ? amt / price : 0;
+  el.innerHTML = `
+    <div class="trade-mkt">
+      <div class="tm-q">${t('mk.q').replace('{o}', esc(outcomeName(f, trade.type)))}</div>
+      <div class="tm-match">${f.home.name} ${t('vs')} ${f.away.name}</div>
+    </div>
+    <div class="yn">
+      <button class="yn-btn yes${trade.side === 'yes' ? ' on' : ''}" onclick="setSide('yes')">${t('mk.yes')} <b>${cents(yp)}¢</b></button>
+      <button class="yn-btn no${trade.side === 'no' ? ' on' : ''}" onclick="setSide('no')">${t('mk.no')} <b>${cents(1 - yp)}¢</b></button>
+    </div>
+    <div class="stake-row"><label>${t('mk.amount')}</label><input id="trade-amt" value="${amt.toFixed(2)}" oninput="readAmt();renderTrade()" /></div>
     <div class="presets">
-      <button class="preset" onclick="setStake(10)">R$10</button>
-      <button class="preset" onclick="setStake(25)">R$25</button>
-      <button class="preset" onclick="setStake(50)">R$50</button>
-      <button class="preset" onclick="setStake(100)">R$100</button>
+      <button class="preset" onclick="setAmt(10)">$10</button>
+      <button class="preset" onclick="setAmt(25)">$25</button>
+      <button class="preset" onclick="setAmt(50)">$50</button>
+      <button class="preset" onclick="setAmt(100)">$100</button>
     </div>
     <div class="slip-summary">
-      <div class="r"><span>${t('slip.totalOdds')}</span><span class="v">${total.toFixed(2)}</span></div>
-      <div class="r"><span>${t('slip.stakeRow')}</span><span class="v">R$ ${stake.toFixed(2).replace('.', ',')}</span></div>
-      <div class="r total"><span>${t('slip.return')}</span><span class="v">R$ ${(stake * total).toFixed(2).replace('.', ',')}</span></div>
+      <div class="r"><span>${t('mk.shares')}</span><span class="v">${shares.toFixed(1)}</span></div>
+      <div class="r"><span>${t('mk.avg')}</span><span class="v">${cents(price)}¢</span></div>
+      <div class="r total"><span>${t('mk.payout')}</span><span class="v">$${shares.toFixed(2)}</span></div>
     </div>
-    <button class="place">${t('slip.place')}</button>`;
+    <button class="place" onclick="buy()" ${amt <= 0 || amt > state.balance ? 'disabled style="opacity:.5;cursor:not-allowed"' : ''}>${t('mk.buy')} · ${cents(price)}¢</button>`;
+}
+
+function renderPositions() {
+  const el = document.getElementById('pos-body');
+  const cnt = document.getElementById('pos-count');
+  cnt.textContent = positions.length;
+  if (!positions.length) { el.innerHTML = `<div class="slip-empty">${t('mk.noPos')}</div>`; return; }
+  el.innerHTML = positions.map((q, i) => {
+    const f = FIX[q.id]; const p = f ? prices(f) : null;
+    const settled = !!(p && p.resolved);
+    const win = settled && (((q.side === 'yes' && p.resolved === q.type) || (q.side === 'no' && p.resolved !== q.type)));
+    const value = q.shares * markPrice(q);
+    const pl = value - q.cost;
+    const plc = pl >= 0 ? 'pos' : 'neg';
+    return `
+      <div class="pos-card${settled ? (win ? ' win' : ' lose') : ''}">
+        <div class="pos-top">
+          <div><div class="pos-name">${q.side === 'no' ? t('mk.no') + ' · ' : ''}${q.label}</div><div class="pos-match">${q.match}</div></div>
+          <button class="rm" onclick="closePos(${i})">×</button>
+        </div>
+        <div class="pos-stats">
+          <span>${q.shares.toFixed(1)} ${t('mk.sharesShort')} @ ${cents(q.avg)}¢</span>
+          <span class="pos-val ${plc}">$${value.toFixed(2)} <em>${pl >= 0 ? '+' : ''}${pl.toFixed(2)}</em></span>
+        </div>
+        ${settled ? `<div class="pos-settle ${win ? 'pos' : 'neg'}">${win ? t('mk.won') : t('mk.lost')}</div>` : ''}
+      </div>`;
+  }).join('');
 }
 
 // ============================================================
@@ -415,8 +527,10 @@ function boot() {
   try { lang = localStorage.getItem('bb_lang') || 'pt'; } catch (e) { lang = 'pt'; }
   document.documentElement.lang = lang === 'pt' ? 'pt-BR' : 'en';
   applyI18n();
+  updateBalance();
   loadFixtures('71');
-  renderSlip();
+  renderTrade();
+  renderPositions();
   hasAccess = checkAccess();
   installPaywallGate();
   if (!hasAccess) openPaywall();

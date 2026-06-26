@@ -313,6 +313,52 @@ img { display: block; max-width: 100%; }
 .odd.active { background: linear-gradient(180deg, var(--accent-2), var(--accent)); border-color: var(--accent); box-shadow: 0 6px 16px var(--accent-glow); }
 .odd.active .ol, .odd.active .op { color: #fff; }
 
+/* ---------- Prediction market rows ---------- */
+.market-row { padding: 14px 18px; border-bottom: 1px solid var(--border); }
+.market-row:last-child { border-bottom: none; }
+.mk-head { display: grid; grid-template-columns: 86px 1fr auto; gap: 14px; align-items: center; }
+.mk-vol { text-align: right; font-size: 13px; font-weight: 700; color: var(--text); white-space: nowrap; }
+.mk-vol span { display: block; font-size: 10px; color: var(--muted-2); font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; }
+.mk-outs { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 12px; }
+.mk-out { position: relative; overflow: hidden; background: var(--panel-2); border: 1px solid transparent;
+  border-radius: 10px; padding: 9px 10px 12px; text-align: left; transition: all 0.12s; }
+.mk-out:hover { border-color: var(--accent); }
+.mk-out.sel { border-color: var(--accent); background: rgba(63,123,255,0.16); }
+.mk-out .mo-name { display: block; font-size: 12px; font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mk-out .mo-pct { display: block; font-size: 18px; font-weight: 800; color: var(--accent-2); margin-top: 2px; }
+.mk-out .mo-bar { position: absolute; left: 0; bottom: 0; height: 3px; width: 100%; background: rgba(255,255,255,0.06); }
+.mk-out .mo-bar span { display: block; height: 100%; background: var(--accent); }
+.mk-out.won { border-color: var(--tag-green); background: rgba(47,210,138,0.14); }
+.mk-out.won .mo-pct { color: var(--tag-green); }
+.mk-out.won .mo-bar span { background: var(--tag-green); }
+.mk-out.dim { opacity: 0.4; }
+
+/* ---------- Trade panel ---------- */
+.trade-mkt { margin-bottom: 6px; }
+.tm-q { font-size: 14px; font-weight: 700; }
+.tm-match { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.yn { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 12px 0; }
+.yn-btn { padding: 11px; border-radius: 10px; font-size: 13px; font-weight: 700; border: 1px solid var(--border); color: var(--muted); transition: all 0.12s; }
+.yn-btn b { font-size: 15px; }
+.yn-btn.yes.on { background: rgba(47,210,138,0.16); border-color: var(--tag-green); color: var(--tag-green); }
+.yn-btn.no.on { background: rgba(255,84,104,0.16); border-color: var(--danger); color: var(--danger); }
+
+/* ---------- Portfolio positions ---------- */
+.pos-card { background: var(--panel-2); border-radius: 10px; padding: 12px; margin-bottom: 10px; border: 1px solid transparent; }
+.pos-card.win { border-color: var(--tag-green); }
+.pos-card.lose { opacity: 0.65; }
+.pos-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.pos-name { font-size: 13px; font-weight: 700; }
+.pos-match { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.pos-stats { display: flex; justify-content: space-between; align-items: center; margin-top: 9px; font-size: 12px; color: var(--muted); }
+.pos-val { font-weight: 800; font-size: 14px; color: var(--text); }
+.pos-val em { font-style: normal; font-size: 11px; margin-left: 4px; }
+.pos-val.pos em { color: var(--tag-green); }
+.pos-val.neg em { color: var(--danger); }
+.pos-settle { margin-top: 9px; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.4px; }
+.pos-settle.pos { color: var(--tag-green); }
+.pos-settle.neg { color: var(--danger); }
+
 /* ---------- Right rail: bet slip ---------- */
 .slip-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
 .slip-head h2 { font-size: 20px; font-weight: 800; letter-spacing: -0.3px; }
@@ -485,4 +531,6 @@ img { display: block; max-width: 100%; }
   .fixture-row { grid-template-columns: 70px 1fr; row-gap: 10px; }
   .fixture-row .odd { grid-column: span 1; }
   .fixture-row .fx-teams { grid-column: 1 / -1; }
+  .mk-head { grid-template-columns: 70px 1fr; }
+  .mk-vol { display: none; }
 }

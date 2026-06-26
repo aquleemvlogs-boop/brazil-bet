@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Brazil Bet — Apostas Esportivas</title>
+<title>Brazil Bet — Mercado de Previsões de Futebol</title>
 <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -49,9 +49,9 @@
       </button>
 
       <div class="balance-block">
-        <div class="bal"><span data-i18n="top.balance">Saldo</span>: <span class="amt">R$ 250,00</span>
+        <div class="bal"><span data-i18n="top.balance">Saldo</span>: <span class="amt" id="bal-amt">$1000.00</span>
           <button class="add-more" onclick="openWallet()" data-i18n="top.addmore">Adicionar</button></div>
-        <div class="escrow">PIX · 24/7</div>
+        <div class="escrow">Mercado de previsões · futebol</div>
       </div>
 
       <div class="avatar-wrap">
@@ -86,13 +86,15 @@
         <div class="fixtures" id="fixtures"><div class="empty">…</div></div>
       </section>
 
-      <!-- Bet slip rail -->
+      <!-- Trade + portfolio rail -->
       <aside class="rail">
-        <div class="slip-head">
-          <h2 data-i18n="slip.title">Bilhete</h2>
-          <span class="cnt" id="slip-count">0</span>
+        <div class="slip-head"><h2 data-i18n="mk.trade">Negociar</h2></div>
+        <div class="slip"><div id="trade-body"></div></div>
+        <div class="slip-head" style="margin-top:20px;">
+          <h2 data-i18n="mk.portfolio">Portfólio</h2>
+          <span class="cnt" id="pos-count">0</span>
         </div>
-        <div class="slip"><div id="slip-body"></div></div>
+        <div class="slip"><div id="pos-body"></div></div>
       </aside>
     </div>
   </div>
