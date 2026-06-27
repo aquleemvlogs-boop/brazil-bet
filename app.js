@@ -1,538 +1,394 @@
 /* ============================================================
-   Brazil Bet — SPORTSBOOK
-   Bet on real fixtures (1 / X / 2 odds) with a bet slip.
-   Polished indigo design + real flag images + paywall + real crypto wallet.
+   Predict — World Cup 2026
+   Real ESPN WC data when available (keyless) + modeled probabilities.
+   Plug in The Odds API for real market % (see ODDS_API_KEY below).
    ============================================================ */
 
-// ---------------- i18n ----------------
-const I18N = {
-  pt: {
-    'nav.sports': 'Mercados', 'nav.live': 'Ao Vivo', 'nav.mybets': 'Portfólio', 'nav.wallet': 'Carteira',
-    'top.search': 'Buscar times ou ligas', 'top.deposit': 'Depositar',
-    'top.balance': 'Saldo', 'top.addmore': 'Adicionar',
-    'feed.upcoming': '{league} · Mercados', 'feed.count': '{n} mercados',
-    'mk.draw': 'Empate', 'mk.vol': 'Volume', 'mk.yes': 'Sim', 'mk.no': 'Não', 'mk.amount': 'Valor (US$)',
-    'mk.shares': 'Cotas', 'mk.sharesShort': 'cotas', 'mk.avg': 'Preço médio', 'mk.payout': 'Retorno máximo',
-    'mk.buy': 'Comprar', 'mk.pickPrompt': 'Selecione um resultado para negociar.', 'mk.noPos': 'Nenhuma posição aberta.',
-    'mk.won': 'Ganhou ✓', 'mk.lost': 'Perdeu', 'mk.q': '{o}', 'mk.trade': 'Negociar', 'mk.portfolio': 'Portfólio',
-    'odds.1': '1', 'odds.X': 'X', 'odds.2': '2', 'live': 'AO VIVO', 'inplay': 'em jogo', 'final': 'Encerrado',
-    'today': 'Hoje', 'tomorrow': 'Amanhã',
-    'slip.title': 'Bilhete', 'slip.empty': 'Toque em uma odd para começar a apostar.',
-    'slip.stake': 'Valor (R$)', 'slip.totalOdds': 'Odds totais', 'slip.stakeRow': 'Aposta',
-    'slip.return': 'Retorno potencial', 'slip.place': 'Apostar agora', 'slip.clear': 'Limpar',
-    'bet.win': '{t} vence', 'bet.draw': 'Empate', 'vs': 'x', 'loading': 'Carregando partidas…',
-    'pw.title': 'Acesso exclusivo — pague para continuar',
-    'pw.sub': 'Assine para ver odds ao vivo e apostar.',
-    'pw.day': 'Diário', 'pw.dayPer': '/dia', 'pw.month': 'Mensal', 'pw.monthPer': '/mês',
-    'pw.year': 'Anual VIP', 'pw.yearPer': '/ano', 'pw.popular': 'POPULAR',
-    'pw.payCard': 'Cartão', 'pw.payCrypto': 'Cripto (USDT)',
-    'pw.cta': 'Pagar agora e entrar', 'pw.ctaCrypto': 'Pagar com carteira',
-    'pw.processing': 'Processando…', 'pw.demo': 'Demonstração — pagamento simulado, nenhum valor é cobrado.',
-    'pw.connectFirst': 'Conecte sua carteira para pagar com USDT.',
-    'wm.title': 'Carteira Cripto', 'wm.metamask': 'Carteira de navegador (EVM)', 'wm.wc': 'Escaneie com seu app',
-    'wm.noWallet': 'Nenhuma carteira detectada. Instale a MetaMask para continuar.', 'wm.install': 'Instalar MetaMask',
-    'wm.address': 'Endereço', 'wm.network': 'Rede', 'wm.native': 'Saldo nativo', 'wm.usdt': 'Saldo USDT',
-    'wm.deposit': 'Depositar USDT', 'wm.to': 'Endereço de destino', 'wm.amount': 'Valor (USDT)',
-    'wm.send': 'Enviar USDT', 'wm.disconnect': 'Desconectar',
-    'wm.warn': 'Você assina a transação na sua carteira. Os fundos vão para o endereço que você informar — esta plataforma não tem custódia.',
-    'wm.needAddr': 'Informe um endereço de destino válido.', 'wm.sending': 'Confirme na carteira…',
-    'wm.sent': 'Transação enviada:', 'wm.failed': 'Falha/cancelada na carteira.',
-    'wm.unsupported': 'USDT não mapeado nesta rede. Troque para Ethereum, BNB Chain ou Polygon.',
-    'mock': '⚠️ Dados de exemplo para esta competição (fora de temporada). As demais ligas usam dados reais.',
-  },
-  en: {
-    'nav.sports': 'Markets', 'nav.live': 'Live', 'nav.mybets': 'Portfolio', 'nav.wallet': 'Wallet',
-    'top.search': 'Search teams or leagues', 'top.deposit': 'Deposit',
-    'top.balance': 'Balance', 'top.addmore': 'Add more',
-    'feed.upcoming': '{league} · Markets', 'feed.count': '{n} markets',
-    'mk.draw': 'Draw', 'mk.vol': 'Volume', 'mk.yes': 'Yes', 'mk.no': 'No', 'mk.amount': 'Amount (US$)',
-    'mk.shares': 'Shares', 'mk.sharesShort': 'shares', 'mk.avg': 'Avg price', 'mk.payout': 'Max payout',
-    'mk.buy': 'Buy', 'mk.pickPrompt': 'Select an outcome to trade.', 'mk.noPos': 'No open positions.',
-    'mk.won': 'Won ✓', 'mk.lost': 'Lost', 'mk.q': '{o}', 'mk.trade': 'Trade', 'mk.portfolio': 'Portfolio',
-    'odds.1': '1', 'odds.X': 'X', 'odds.2': '2', 'live': 'LIVE', 'inplay': 'in play', 'final': 'Final',
-    'today': 'Today', 'tomorrow': 'Tomorrow',
-    'slip.title': 'Bet slip', 'slip.empty': 'Tap an odd to start betting.',
-    'slip.stake': 'Stake (R$)', 'slip.totalOdds': 'Total odds', 'slip.stakeRow': 'Stake',
-    'slip.return': 'Potential return', 'slip.place': 'Place bet', 'slip.clear': 'Clear',
-    'bet.win': '{t} to win', 'bet.draw': 'Draw', 'vs': 'vs', 'loading': 'Loading matches…',
-    'pw.title': 'Members only — pay to continue',
-    'pw.sub': 'Subscribe to see live odds and place bets.',
-    'pw.day': 'Daily', 'pw.dayPer': '/day', 'pw.month': 'Monthly', 'pw.monthPer': '/mo',
-    'pw.year': 'Annual VIP', 'pw.yearPer': '/yr', 'pw.popular': 'POPULAR',
-    'pw.payCard': 'Card', 'pw.payCrypto': 'Crypto (USDT)',
-    'pw.cta': 'Pay now & enter', 'pw.ctaCrypto': 'Pay with wallet',
-    'pw.processing': 'Processing…', 'pw.demo': 'Demo — simulated payment, nothing is charged.',
-    'pw.connectFirst': 'Connect your wallet to pay with USDT.',
-    'wm.title': 'Crypto Wallet', 'wm.metamask': 'Browser wallet (EVM)', 'wm.wc': 'Scan with your app',
-    'wm.noWallet': 'No wallet detected. Install MetaMask to continue.', 'wm.install': 'Install MetaMask',
-    'wm.address': 'Address', 'wm.network': 'Network', 'wm.native': 'Native balance', 'wm.usdt': 'USDT balance',
-    'wm.deposit': 'Deposit USDT', 'wm.to': 'Destination address', 'wm.amount': 'Amount (USDT)',
-    'wm.send': 'Send USDT', 'wm.disconnect': 'Disconnect',
-    'wm.warn': 'You sign the transaction in your own wallet. Funds go to the address you enter — this platform takes no custody.',
-    'wm.needAddr': 'Enter a valid destination address.', 'wm.sending': 'Confirm in your wallet…',
-    'wm.sent': 'Transaction sent:', 'wm.failed': 'Failed/rejected in wallet.',
-    'wm.unsupported': 'USDT not mapped on this network. Switch to Ethereum, BNB Chain or Polygon.',
-    'mock': '⚠️ Sample data for this competition (off-season). Other leagues use real data.',
-  },
-};
-let lang = 'pt';
-function t(key) { return (I18N[lang] && I18N[lang][key]) || I18N.pt[key] || key; }
-function applyI18n() {
-  document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
-  document.querySelectorAll('[data-i18n-ph]').forEach(el => { el.placeholder = t(el.dataset.i18nPh); });
-  const togLabel = lang === 'pt' ? '🇬🇧 EN' : '🇧🇷 PT';
-  document.querySelectorAll('.lang-toggle').forEach(b => { b.textContent = togLabel; });
-}
-function setLang(l) {
-  lang = l;
-  try { localStorage.setItem('bb_lang', l); } catch (e) {}
-  document.documentElement.lang = l === 'pt' ? 'pt-BR' : 'en';
-  applyI18n();
-  loadFixtures(state.league);
-  renderTrade();
-  renderPositions();
-  if (wallet.address) renderWallet();
-}
-function toggleLang() { setLang(lang === 'pt' ? 'en' : 'pt'); }
+// Paste your The Odds API key here (the-odds-api.com) to use real odds → %.
+const ODDS_API_KEY = '';
 
-// ---------------- real flag images ----------------
-function flagURL(code, w) { return `https://flagcdn.com/w${w || 40}/${(code || 'br').toLowerCase()}.png`; }
-
-// Map team names → country code (for the demo). With a real API key, the fixtures
-// API returns real club crest URLs and those are used instead.
-const TEAM_CC = {
-  'flamengo': 'br', 'fluminense': 'br', 'palmeiras': 'br', 'corinthians': 'br', 'são paulo': 'br',
-  'santos': 'br', 'grêmio': 'br', 'internacional': 'br', 'atlético-mg': 'br', 'cruzeiro': 'br',
-  'botafogo': 'br', 'brasil': 'br', 'boca juniors': 'ar', 'river plate': 'ar', 'argentina': 'ar',
-  'peñarol': 'uy', 'uruguai': 'uy', 'real madrid': 'es', 'espanha': 'es', 'frança': 'fr', 'psg': 'fr',
-  'inglaterra': 'gb-eng', 'manchester city': 'gb-eng', 'portugal': 'pt', 'bayern de munique': 'de',
-  'colômbia': 'co', 'equador': 'ec', 'al hilal': 'sa',
+// ---------------- flag + code helpers ----------------
+const CC = {
+  Croatia:'hr',Ghana:'gh',Panama:'pa',England:'gb-eng',Colombia:'co',Portugal:'pt','DR Congo':'cd',
+  Uzbekistan:'uz',Jordan:'jo',Argentina:'ar',Brazil:'br',Morocco:'ma',Spain:'es',Germany:'de',France:'fr',
+  Belgium:'be',Mexico:'mx','South Africa':'za','Korea Republic':'kr',Czechia:'cz',Switzerland:'ch',Canada:'ca',
+  'Bosnia and Herzegovina':'ba',Qatar:'qa',Scotland:'gb-sct',Haiti:'ht','United States':'us',USA:'us',Australia:'au',
+  Paraguay:'py','Türkiye':'tr',Turkey:'tr',Netherlands:'nl','Saudi Arabia':'sa',Ecuador:'ec',Uruguay:'uy',
+  Japan:'jp',Senegal:'sn',Nigeria:'ng',Egypt:'eg',Italy:'it',Norway:'no',Denmark:'dk',Poland:'pl',Austria:'at',
 };
-function crestHTML(name, logo) {
-  const url = logo || (TEAM_CC[name.toLowerCase()] ? flagURL(TEAM_CC[name.toLowerCase()], 40) : null);
-  if (url) return `<img class="crest" src="${url}" alt="" loading="lazy" />`;
-  const hue = (name.charCodeAt(0) * 11) % 360;
-  return `<span class="crest" style="background:linear-gradient(135deg,hsl(${hue} 60% 52%),hsl(${(hue + 40) % 360} 55% 34%));"></span>`;
+const TLA = {
+  Croatia:'HRV',Ghana:'GHA',Panama:'PAN',England:'ENG',Colombia:'COL',Portugal:'PRT','DR Congo':'CDR',
+  Uzbekistan:'UZB',Jordan:'JOR',Argentina:'ARG',Brazil:'BRA',Morocco:'MAR',Spain:'ESP',Germany:'GER',France:'FRA',
+  Belgium:'BEL',Mexico:'MEX','South Africa':'RSA','Korea Republic':'KOR',Czechia:'CZE',Switzerland:'SUI',
+  Canada:'CAN','Bosnia and Herzegovina':'BIH',Qatar:'QAT',Scotland:'SCO',Haiti:'HAI','United States':'USA',
+  USA:'USA',Australia:'AUS',Paraguay:'PAR','Türkiye':'TUR',Netherlands:'NED',Uruguay:'URU',Ecuador:'ECU',
+};
+function flagURL(cc, w) { return cc ? `https://flagcdn.com/w${w || 40}/${cc}.png` : ''; }
+function teamFlag(name, w) { return flagURL(CC[name], w); }
+function tla(name) { return TLA[name] || name.replace(/[^A-Za-z]/g, '').slice(0, 3).toUpperCase(); }
+function crest(name, w) {
+  const u = teamFlag(name, w);
+  return u ? `<img class="crest" src="${u}" alt="" loading="lazy" />`
+           : `<span class="crest" style="background:linear-gradient(135deg,#2f6bff,#15161d)"></span>`;
 }
 
-// ---------------- leagues (banner selectors) ----------------
-const LEAGUES = {
-  '71': { label: 'Brasileirão', sub: 'Série A', grad: 'linear-gradient(100deg,#0a5a2a 0%,#0f7d3a 55%,#23c065 100%)', photo: 'https://loremflickr.com/640/240/soccer,player?lock=21' },
-  '1':  { label: 'Copa do Mundo FIFA', sub: 'Seleções', grad: 'linear-gradient(100deg,#16264f 0%,#234f86 60%,#2b6fd6 100%)', photo: 'https://loremflickr.com/640/240/football,stadium?lock=22' },
-  '13': { label: 'Libertadores', sub: 'CONMEBOL', grad: 'linear-gradient(100deg,#3a1606 0%,#7a3410 55%,#d4711f 100%)', photo: 'https://loremflickr.com/640/240/soccer,fans?lock=13' },
-};
+// ---------------- mock World Cup dataset (fallback / groups / winner / golden) ----------------
+const MOCK_MATCHES = [
+  ['Croatia','Ghana',53,28,19,190,'Jun 28 · 2:30AM'],
+  ['Panama','England',5,11,84,188,'Jun 28 · 2:30AM'],
+  ['Colombia','Portugal',28,25,47,258,'Jun 28 · 5:00AM'],
+  ['DR Congo','Uzbekistan',62,24,14,111,'Jun 28 · 5:00AM'],
+  ['Jordan','Argentina',5,11,84,412,'Jun 28 · 8:00AM'],
+  ['Brazil','Morocco',61,23,16,377,'Jun 29 · 2:30AM'],
+  ['Spain','Germany',44,27,29,512,'Jun 29 · 5:00AM'],
+  ['France','Belgium',48,26,26,448,'Jun 29 · 8:00AM'],
+];
+const GROUPS = [
+  ['A', [['Mexico',3,0,0,9],['South Africa',1,1,1,4],['Korea Republic',1,0,2,3],['Czechia',0,1,2,1]]],
+  ['B', [['Switzerland',2,1,0,7],['Canada',1,1,1,4],['Bosnia and Herzegovina',1,1,1,4],['Qatar',0,1,2,1]]],
+  ['C', [['Brazil',2,1,0,7],['Morocco',2,1,0,7],['Scotland',1,0,2,3],['Haiti',0,0,3,0]]],
+  ['D', [['United States',2,1,0,7],['Australia',1,1,1,4],['Paraguay',1,0,2,3],['Türkiye',0,0,3,0]]],
+  ['E', [['France',3,0,0,9],['Senegal',1,1,1,4],['Norway',1,0,2,3],['Japan',0,1,2,1]]],
+  ['F', [['Argentina',2,1,0,7],['Spain',2,0,1,6],['Nigeria',1,1,1,4],['Jordan',0,0,3,0]]],
+];
+const WINNERS = [
+  ['Brazil',14],['Argentina',12],['France',11],['Spain',10],['England',9],['Germany',7],['Portugal',6],['Netherlands',5],
+  ['Belgium',4],['Morocco',3],['Uruguay',2],['Croatia',2],['United States',2],['Colombia',1],['Mexico',1],['Senegal',1],
+];
+const GOLDEN = [
+  ['Lionel Messi','Golden Ball winner',42],
+  ['Emiliano Martínez','Golden Glove winner',17],
+  ['Kylian Mbappé','Golden Boot winner',26],
+];
 
-const state = { league: '71', balance: 1000, fixtures: [] };
-
-// ---------------- real data: ESPN public API (called directly from the browser) ----------------
-// ESPN's scoreboard endpoints are CORS-enabled, so the static site fetches them
-// directly — no backend needed. Real fixtures, live scores, crests, and (when
-// available) real odds. Production: move to a licensed feed.
-const ESPN_SLUG = { '71': 'bra.1', '1': 'fifa.world', '13': 'conmebol.libertadores', '2': 'uefa.champions', '15': 'fifa.cwc' };
-const ESPN_NAME = { '71': 'Brasileirão Série A', '1': 'Copa do Mundo FIFA', '13': 'CONMEBOL Libertadores', '2': 'UEFA Champions League', '15': 'Mundial de Clubes FIFA' };
-
-// Sample fallback (e.g. World Cup off-season, when ESPN returns no events).
-const MOCK = {
-  '1': [
-    { id: 'wc1', league: 'Copa do Mundo FIFA', date: new Date(Date.now() + 6 * 36e5).toISOString(), status: 'NS', minute: null, home: { name: 'Brasil', logo: '', score: null }, away: { name: 'Argentina', logo: '', score: null }, odds: null },
-    { id: 'wc2', league: 'Copa do Mundo FIFA', date: new Date(Date.now() + 30 * 36e5).toISOString(), status: 'NS', minute: null, home: { name: 'França', logo: '', score: null }, away: { name: 'Inglaterra', logo: '', score: null }, odds: null },
-    { id: 'wc3', league: 'Copa do Mundo FIFA', date: new Date(Date.now() + 54 * 36e5).toISOString(), status: 'NS', minute: null, home: { name: 'Portugal', logo: '', score: null }, away: { name: 'Espanha', logo: '', score: null }, odds: null },
-  ],
-  '15': [
-    { id: 'cwc1', league: 'Mundial de Clubes FIFA', date: new Date(Date.now() + 48 * 36e5).toISOString(), status: 'NS', minute: null, home: { name: 'Flamengo', logo: '', score: null }, away: { name: 'Real Madrid', logo: '', score: null }, odds: null },
-    { id: 'cwc2', league: 'Mundial de Clubes FIFA', date: new Date(Date.now() + 50 * 36e5).toISOString(), status: 'NS', minute: null, home: { name: 'Palmeiras', logo: '', score: null }, away: { name: 'Al Hilal', logo: '', score: null }, odds: null },
-  ],
-};
-
-function amToDec(am) { if (am == null || isNaN(am)) return null; am = Number(am); return am > 0 ? +((am / 100) + 1).toFixed(2) : +((100 / -am) + 1).toFixed(2); }
-function parseEspnOdds(comp) {
-  const od = comp.odds && comp.odds[0]; if (!od) return null;
-  const ml = (o) => o?.moneyLine ?? o?.current?.moneyLine?.american ?? o?.moneyLineOdds;
-  const h = amToDec(ml(od.homeTeamOdds)), d = amToDec(ml(od.drawOdds)), a = amToDec(ml(od.awayTeamOdds));
-  if (h && a) return { home: h, draw: d || +(((h + a) / 1.55)).toFixed(2), away: a }; // real moneylines → decimal
-  return null;
-}
-function shapeEspn(ev, leagueName) {
+// ---------------- ESPN real data ----------------
+function shapeEspn(ev) {
   const comp = (ev.competitions && ev.competitions[0]) || {}; const cs = comp.competitors || [];
-  const home = cs.find(c => c.homeAway === 'home') || cs[0] || {}; const away = cs.find(c => c.homeAway === 'away') || cs[1] || {};
-  const st = ev.status?.type?.state; let status = 'NS', minute = null;
-  if (st === 'in') { status = (ev.status?.period >= 2) ? '2H' : '1H'; minute = parseInt(ev.status?.displayClock, 10) || ev.status?.clock || null; }
+  const home = cs.find(c => c.homeAway === 'home') || cs[0] || {};
+  const away = cs.find(c => c.homeAway === 'away') || cs[1] || {};
+  const st = ev.status?.type?.state;
+  let status = 'NS', minute = null;
+  if (st === 'in') { status = (ev.status?.period >= 2) ? '2H' : '1H'; minute = parseInt(ev.status?.displayClock, 10) || null; }
   else if (st === 'post') status = 'FT';
-  const team = (c) => ({ name: c.team?.shortDisplayName || c.team?.displayName || c.team?.name || '—', logo: c.team?.logo || '', score: (st === 'pre' || c.score == null) ? null : Number(c.score) });
-  return { id: String(ev.id), league: leagueName, date: ev.date, status, minute, home: team(home), away: team(away), odds: parseEspnOdds(comp) };
-}
-async function fetchFixtures(leagueId) {
-  const slug = ESPN_SLUG[leagueId];
-  if (slug) {
-    try {
-      const r = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${slug}/scoreboard`);
-      if (r.ok) {
-        const j = await r.json();
-        const fx = (j.events || []).map(ev => shapeEspn(ev, ESPN_NAME[leagueId] || j.leagues?.[0]?.name));
-        if (fx.length) return { source: 'espn', fixtures: fx };
-      }
-    } catch (e) { console.warn('ESPN failed, using sample data:', e); }
+  const nm = (c) => c.team?.shortDisplayName || c.team?.displayName || c.team?.name || '—';
+  const sc = (c) => (st === 'pre' || c.score == null) ? null : Number(c.score);
+  const od = comp.odds && comp.odds[0];
+  let probs = null;
+  if (od) {
+    const ml = (o) => o?.moneyLine ?? o?.current?.moneyLine?.american;
+    const dec = (am) => am == null || isNaN(am) ? null : (am > 0 ? am / 100 + 1 : 100 / -am + 1);
+    const h = dec(ml(od.homeTeamOdds)), d = dec(ml(od.drawOdds)), a = dec(ml(od.awayTeamOdds));
+    if (h && a) { const ih = 1 / h, id = 1 / (d || 50), ia = 1 / a, s = ih + id + ia; probs = { h: ih / s, d: id / s, a: ia / s }; }
   }
-  return { source: 'mock', fixtures: MOCK[leagueId] || [] };
+  return { id: String(ev.id), home: nm(home), away: nm(away), hs: sc(home), as: sc(away), status, minute,
+    when: new Date(ev.date), probs };
 }
-
-// Deterministic display odds per fixture, used when ESPN doesn't expose real ones.
-function genOdds(id) {
+function seedProbs(id) {
   const s = String(id).split('').reduce((a, c) => a + c.charCodeAt(0), 0);
   const r = (n) => Math.abs(Math.sin(s * 0.7 + n));
-  return { home: +(1.35 + r(1) * 2.6).toFixed(2), draw: +(2.9 + r(2) * 1.7).toFixed(2), away: +(1.55 + r(3) * 4).toFixed(2) };
+  const h = 0.3 + r(1) * 0.4, d = 0.18 + r(2) * 0.12, a = 0.2 + r(3) * 0.4, t = h + d + a;
+  return { h: h / t, d: d / t, a: a / t };
 }
 
-function kickoff(iso) {
-  const d = new Date(iso), now = new Date();
-  const tom = new Date(now); tom.setDate(now.getDate() + 1);
-  const hh = String(d.getHours()).padStart(2, '0'), mm = String(d.getMinutes()).padStart(2, '0');
-  const wd = { pt: ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'], en: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] };
-  const label = d.toDateString() === now.toDateString() ? t('today')
-    : d.toDateString() === tom.toDateString() ? t('tomorrow') : wd[lang][d.getDay()];
-  return { label, time: `${hh}:${mm}` };
+const MARKETS = {};   // id -> market
+const state = { balance: 1000, fixtures: [] };
+
+function fmtWhen(d) {
+  const wd = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()];
+  const mo = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()];
+  let h = d.getHours(); const ap = h >= 12 ? 'PM' : 'AM'; h = h % 12 || 12;
+  return `${mo} ${d.getDate()} · ${h}:${String(d.getMinutes()).padStart(2,'0')}${ap}`;
 }
 
-async function loadFixtures(leagueId) {
-  state.league = leagueId;
-  const lg = LEAGUES[leagueId] || LEAGUES['71'];
-  const body = document.getElementById('fixtures');
-  document.getElementById('feed-title').textContent = t('feed.upcoming').replace('{league}', lg.label);
-  body.innerHTML = `<div class="empty">${t('loading')}</div>`;
+async function loadMarkets() {
+  let markets = [];
   try {
-    const { fixtures, source } = await fetchFixtures(leagueId);
-    state.fixtures = fixtures;
-    document.getElementById('feed-count').textContent = t('feed.count').replace('{n}', fixtures.length);
-    body.innerHTML = fixtures.length ? fixtures.map(marketRow).join('') : `<div class="empty">${t('mock')}</div>`;
-    if (source === 'mock') flagMock(); else clearMock();
-  } catch (e) {
-    console.error(e);
-    body.innerHTML = `<div class="empty">${t('wm.failed')}</div>`;
-  }
-}
+    const r = await fetch('https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard');
+    if (r.ok) {
+      const j = await r.json();
+      const evs = (j.events || []).map(shapeEspn);
+      if (evs.length) markets = evs.map(e => ({
+        id: e.id, home: e.home, away: e.away, hs: e.hs, as: e.as, status: e.status, minute: e.minute,
+        when: fmtWhen(e.when), probs: e.probs || seedProbs(e.id), vol: 80 + (parseInt(e.id.slice(-3)) || 100) % 400, real: true,
+      }));
+    }
+  } catch (e) { console.warn('ESPN WC unavailable, using sample slate', e); }
 
-// ============================================================
-//  Prediction market — probabilities (¢), local trading, real resolution
-// ============================================================
-const FIX = {};            // fixture registry by id (for the trade panel + settlement)
-const marketState = {};    // id -> { adj:{home,draw,away} } local price pressure from trades
-const positions = [];      // open positions
-let trade = { id: null, type: null, side: 'yes', amount: 25 };
-const TRADE_IMPACT = 0.0008; // toy liquidity: probability move per $ of net YES flow
+  if (!markets.length) {
+    markets = MOCK_MATCHES.map((m, i) => ({
+      id: 'wc' + i, home: m[0], away: m[1], hs: null, as: null, status: 'NS', minute: null,
+      when: m[6], probs: normalize({ h: m[2], d: m[3], a: m[4] }), vol: m[5], real: false,
+    }));
+    flagMock();
+  } else { clearMock(); }
 
-function normalize(p) { const s = (p.home + p.draw + p.away) || 1; return { home: p.home / s, draw: p.draw / s, away: p.away / s }; }
-function impliedFromOdds(o) { return normalize({ home: 1 / o.home, draw: 1 / (o.draw || 50), away: 1 / o.away }); } // de-vigged
-function liveProb(f) {
-  const diff = (f.home.score || 0) - (f.away.score || 0);
-  const remain = Math.max(0, 90 - Math.min(90, f.minute || 45)) / 90;
-  const lead = Math.max(0.05, Math.min(0.95, 0.45 + diff * 0.18));
-  const draw = Math.max(0.05, 0.30 * remain + (diff === 0 ? 0.18 * remain : 0));
-  return normalize({ home: lead * (1 - draw), draw, away: (1 - lead) * (1 - draw) });
+  state.fixtures = markets;
+  markets.forEach(m => MARKETS[m.id] = m);
+  renderCards();
+  renderGames();
 }
-function seedProb(id) {
-  const s = String(id).split('').reduce((a, c) => a + c.charCodeAt(0), 0);
-  const r = (n) => Math.abs(Math.sin(s * 0.7 + n));
-  return normalize({ home: 0.3 + r(1) * 0.4, draw: 0.18 + r(2) * 0.12, away: 0.2 + r(3) * 0.4 });
-}
-function basePrices(f) {
-  if (f.odds) return impliedFromOdds(f.odds);          // real bookmaker odds → probability
-  if (['1H', '2H', 'HT'].includes(f.status)) return liveProb(f); // live model from score + minute
-  return seedProb(f.id);
-}
-function resolvedOutcome(f) {
-  if (!['FT', 'AET', 'PEN'].includes(f.status) || f.home.score == null || f.away.score == null) return null;
-  return f.home.score > f.away.score ? 'home' : f.away.score > f.home.score ? 'away' : 'draw';
-}
-function prices(f) {
-  const res = resolvedOutcome(f);
-  if (res) return { home: res === 'home' ? 1 : 0, draw: res === 'draw' ? 1 : 0, away: res === 'away' ? 1 : 0, resolved: res };
-  const base = basePrices(f);
-  const adj = marketState[f.id]?.adj || { home: 0, draw: 0, away: 0 };
-  const p = normalize({
-    home: Math.max(0.01, base.home + adj.home),
-    draw: Math.max(0.01, base.draw + adj.draw),
-    away: Math.max(0.01, base.away + adj.away),
-  });
-  return { ...p, resolved: null };
-}
-const cents = (x) => Math.round(x * 100);
-function volOf(id) { const s = String(id).split('').reduce((a, c) => a + c.charCodeAt(0), 0); return 3 + (s % 47) + (s % 9) / 10; }
-function outcomeName(f, type) { return type === 'draw' ? t('mk.draw') : (type === 'home' ? f.home.name : f.away.name); }
+function normalize(p) { const s = p.h + p.d + p.a || 1; return { h: p.h / s, d: p.d / s, a: p.a / s }; }
 
-function marketRow(f) {
-  FIX[f.id] = f;
-  const isLive = ['1H', '2H', 'HT', 'ET', 'P', 'BT'].includes(f.status);
-  const isDone = ['FT', 'AET', 'PEN'].includes(f.status);
-  const p = prices(f);
-  let timeHtml;
-  if (isLive) timeHtml = `<span class="live">${t('live')}</span><span>${f.minute ? f.minute + "'" : f.status}</span>`;
-  else if (isDone) timeHtml = `<span class="done">${t('final')}</span><span>${kickoff(f.date).label}</span>`;
-  else { const k = kickoff(f.date); timeHtml = `<span>${k.label}</span><span>${k.time}</span>`; }
-  const sH = (isLive || isDone) && f.home.score != null ? `<span class="score">${f.home.score}</span>` : '';
-  const sA = (isLive || isDone) && f.away.score != null ? `<span class="score">${f.away.score}</span>` : '';
-  const chip = (type) => {
-    const pct = cents(p[type]);
-    const sel = trade.id === f.id && trade.type === type ? ' sel' : '';
-    const cls = p.resolved === type ? ' won' : (p.resolved ? ' dim' : '');
-    const click = p.resolved ? '' : `onclick="openTrade('${f.id}','${type}')"`;
-    return `<button class="mk-out${sel}${cls}" ${click}>
-      <span class="mo-name">${esc(outcomeName(f, type))}</span><span class="mo-pct">${pct}¢</span>
-      <span class="mo-bar"><span style="width:${pct}%"></span></span></button>`;
-  };
-  return `
-    <div class="market-row">
-      <div class="mk-head">
-        <div class="fx-time">${timeHtml}</div>
-        <div class="fx-teams">
-          <div class="fx-team">${crestHTML(f.home.name, f.home.logo)}<span>${f.home.name}</span>${sH}</div>
-          <div class="fx-team">${crestHTML(f.away.name, f.away.logo)}<span>${f.away.name}</span>${sA}</div>
-        </div>
-        <div class="mk-vol">$${volOf(f.id).toFixed(1)}k<span>${t('mk.vol')}</span></div>
-      </div>
-      <div class="mk-outs">${chip('home')}${chip('draw')}${chip('away')}</div>
-    </div>`;
-}
-function rerenderMarkets() {
-  const body = document.getElementById('fixtures');
-  if (body && state.fixtures && state.fixtures.length) body.innerHTML = state.fixtures.map(marketRow).join('');
-}
-function esc(s) { return String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'"); }
-
-function selectLeague(el, leagueId) {
-  document.querySelectorAll('.banner').forEach(b => b.classList.remove('active'));
-  el.classList.add('active');
-  loadFixtures(leagueId);
-}
-
-function flagMock() {
-  let bar = document.getElementById('mock-bar');
-  if (!bar) { bar = document.createElement('div'); bar.id = 'mock-bar'; document.body.prepend(bar); }
-  bar.textContent = t('mock');
-}
-function clearMock() { const b = document.getElementById('mock-bar'); if (b) b.remove(); }
-
-// ============================================================
-//  Trading + portfolio
-// ============================================================
-function openTrade(id, type) {
-  trade = { id, type, side: 'yes', amount: trade.amount || 25 };
-  rerenderMarkets();
-  renderTrade();
-}
-function setSide(s) { trade.side = s; renderTrade(); }
-function setAmt(v) { trade.amount = v; renderTrade(); }
-function readAmt() { const el = document.getElementById('trade-amt'); if (el) trade.amount = parseFloat(el.value.replace(',', '.')) || 0; }
-function yesPrice(id, type) { const f = FIX[id]; return f ? prices(f)[type] : 0.5; }
-// Mark a position to the current market: YES pays the outcome prob, NO pays 1-prob;
-// once resolved it's $1 if correct, else $0.
-function markPrice(q) {
-  const f = FIX[q.id]; const p = f ? prices(f) : null;
-  if (!p) return q.avg;
-  if (p.resolved) return (((q.side === 'yes' && p.resolved === q.type) || (q.side === 'no' && p.resolved !== q.type)) ? 1 : 0);
-  return q.side === 'yes' ? p[q.type] : (1 - p[q.type]);
-}
-
-function buy() {
-  const f = FIX[trade.id]; if (!f) return;
-  const yp = yesPrice(trade.id, trade.type);
-  const price = trade.side === 'yes' ? yp : (1 - yp);          // cost per share in $
-  if (price <= 0.01 || price >= 0.99) return;
-  const amt = trade.amount || 0;
-  if (amt <= 0 || amt > state.balance) return;
-  positions.push({ id: trade.id, type: trade.type, side: trade.side, shares: amt / price, cost: amt, avg: price,
-    label: outcomeName(f, trade.type), match: `${f.home.name} ${t('vs')} ${f.away.name}` });
-  const st = marketState[trade.id] || (marketState[trade.id] = { adj: { home: 0, draw: 0, away: 0 } });
-  st.adj[trade.type] = (st.adj[trade.type] || 0) + TRADE_IMPACT * amt * (trade.side === 'yes' ? 1 : -1);
-  state.balance -= amt;
-  updateBalance();
-  rerenderMarkets();
-  renderTrade();
-  renderPositions();
-}
-function closePos(i) {
-  const q = positions[i]; if (!q) return;
-  state.balance += q.shares * markPrice(q);                    // cash out at current mark
-  positions.splice(i, 1);
-  updateBalance();
-  renderPositions();
-}
-function updateBalance() { const el = document.getElementById('bal-amt'); if (el) el.textContent = '$' + state.balance.toFixed(2); }
-
-function renderTrade() {
-  const el = document.getElementById('trade-body');
-  if (!trade.id || !FIX[trade.id]) { el.innerHTML = `<div class="slip-empty">${t('mk.pickPrompt')}</div>`; return; }
-  const f = FIX[trade.id];
-  const yp = yesPrice(trade.id, trade.type);
-  const price = trade.side === 'yes' ? yp : (1 - yp);
-  const amt = trade.amount || 0;
-  const shares = price > 0 ? amt / price : 0;
-  el.innerHTML = `
-    <div class="trade-mkt">
-      <div class="tm-q">${t('mk.q').replace('{o}', esc(outcomeName(f, trade.type)))}</div>
-      <div class="tm-match">${f.home.name} ${t('vs')} ${f.away.name}</div>
-    </div>
-    <div class="yn">
-      <button class="yn-btn yes${trade.side === 'yes' ? ' on' : ''}" onclick="setSide('yes')">${t('mk.yes')} <b>${cents(yp)}¢</b></button>
-      <button class="yn-btn no${trade.side === 'no' ? ' on' : ''}" onclick="setSide('no')">${t('mk.no')} <b>${cents(1 - yp)}¢</b></button>
-    </div>
-    <div class="stake-row"><label>${t('mk.amount')}</label><input id="trade-amt" value="${amt.toFixed(2)}" oninput="readAmt();renderTrade()" /></div>
-    <div class="presets">
-      <button class="preset" onclick="setAmt(10)">$10</button>
-      <button class="preset" onclick="setAmt(25)">$25</button>
-      <button class="preset" onclick="setAmt(50)">$50</button>
-      <button class="preset" onclick="setAmt(100)">$100</button>
-    </div>
-    <div class="slip-summary">
-      <div class="r"><span>${t('mk.shares')}</span><span class="v">${shares.toFixed(1)}</span></div>
-      <div class="r"><span>${t('mk.avg')}</span><span class="v">${cents(price)}¢</span></div>
-      <div class="r total"><span>${t('mk.payout')}</span><span class="v">$${shares.toFixed(2)}</span></div>
-    </div>
-    <button class="place" onclick="buy()" ${amt <= 0 || amt > state.balance ? 'disabled style="opacity:.5;cursor:not-allowed"' : ''}>${t('mk.buy')} · ${cents(price)}¢</button>`;
-}
-
-function renderPositions() {
-  const el = document.getElementById('pos-body');
-  const cnt = document.getElementById('pos-count');
-  cnt.textContent = positions.length;
-  if (!positions.length) { el.innerHTML = `<div class="slip-empty">${t('mk.noPos')}</div>`; return; }
-  el.innerHTML = positions.map((q, i) => {
-    const f = FIX[q.id]; const p = f ? prices(f) : null;
-    const settled = !!(p && p.resolved);
-    const win = settled && (((q.side === 'yes' && p.resolved === q.type) || (q.side === 'no' && p.resolved !== q.type)));
-    const value = q.shares * markPrice(q);
-    const pl = value - q.cost;
-    const plc = pl >= 0 ? 'pos' : 'neg';
+// ---------------- render: match cards ----------------
+const cent = (x) => Math.round(x * 100);
+function renderCards() {
+  const el = document.getElementById('match-cards');
+  el.innerHTML = state.fixtures.slice(0, 8).map(m => {
+    const live = ['1H','2H','HT'].includes(m.status);
+    const hcc = CC[m.home], acc = CC[m.away];
+    const artH = hcc ? `style="background-image:url('${flagURL(hcc,160)}')"` : 'style="background:#23262f"';
+    const artA = acc ? `style="background-image:url('${flagURL(acc,160)}')"` : 'style="background:#181a22"';
     return `
-      <div class="pos-card${settled ? (win ? ' win' : ' lose') : ''}">
-        <div class="pos-top">
-          <div><div class="pos-name">${q.side === 'no' ? t('mk.no') + ' · ' : ''}${q.label}</div><div class="pos-match">${q.match}</div></div>
-          <button class="rm" onclick="closePos(${i})">×</button>
+    <div class="mcard">
+      <div class="mcard-art"><div class="half" ${artH}></div><div class="half r" ${artA}></div></div>
+      <div class="mcard-body">
+        <div class="mcard-title">${m.home} vs. ${m.away}</div>
+        <div class="mcard-probs">
+          ${crest(m.home, 40)}
+          <span class="pp home">${cent(m.probs.h)}%</span>
+          <span class="pp mut">${cent(m.probs.d)}%</span>
+          <span class="pp mut">${cent(m.probs.a)}%</span>
+          <span class="spacer"></span>${crest(m.away, 40)}
         </div>
-        <div class="pos-stats">
-          <span>${q.shares.toFixed(1)} ${t('mk.sharesShort')} @ ${cents(q.avg)}¢</span>
-          <span class="pos-val ${plc}">$${value.toFixed(2)} <em>${pl >= 0 ? '+' : ''}${pl.toFixed(2)}</em></span>
+        <div class="mcard-outs">
+          <button class="out-btn home" onclick="openTrade('${m.id}','h')">${tla(m.home)}</button>
+          <button class="out-btn draw" onclick="openTrade('${m.id}','d')">DRAW</button>
+          <button class="out-btn away" onclick="openTrade('${m.id}','a')">${tla(m.away)}</button>
         </div>
-        ${settled ? `<div class="pos-settle ${win ? 'pos' : 'neg'}">${win ? t('mk.won') : t('mk.lost')}</div>` : ''}
-      </div>`;
+        <div class="mcard-foot">
+          <span class="spark"></span><span class="up">+${(m.vol / 80).toFixed(1)}K</span>
+          <span class="fi">📊 $${m.vol}K</span><span class="fi">🕑 ${live ? m.minute + "'" : m.when}</span>
+        </div>
+      </div>
+    </div>`;
   }).join('');
 }
 
-// ============================================================
-//  REAL crypto wallet (EIP-1193)
-// ============================================================
-const USDT = {
-  '0x1':  { addr: '0xdAC17F958D2ee523a2206206994597C13D831ec7', dec: 6,  name: 'Ethereum' },
-  '0x38': { addr: '0x55d398326f99059fF775485246999027B3197955', dec: 18, name: 'BNB Chain' },
-  '0x89': { addr: '0xc2132D05D31c914a87C6611C10748AEb04B58e8F', dec: 6,  name: 'Polygon' },
-};
-const NET_NAMES = { '0x1': 'Ethereum', '0x38': 'BNB Chain', '0x89': 'Polygon', '0xa': 'Optimism', '0xa4b1': 'Arbitrum', '0x2105': 'Base' };
-const wallet = { address: null, chainId: null, native: 0, usdt: 0 };
-function hasProvider() { return typeof window.ethereum !== 'undefined'; }
+// ---------------- render: winner grid ----------------
+function renderWinners() {
+  document.getElementById('winner-grid').innerHTML = WINNERS.map(w => `
+    <div class="win-cell">${crest(w[0], 80)}<span class="wp">${w[1]}%</span></div>`).join('')
+    .replace(/class="crest"/g, 'class="crest" style="width:100%;aspect-ratio:1;border-radius:7px"');
+}
 
-async function connectWallet() {
-  if (!hasProvider()) { renderWallet(); return; }
-  try {
-    const accts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-    wallet.address = accts[0];
-    wallet.chainId = await window.ethereum.request({ method: 'eth_chainId' });
-    window.ethereum.on?.('accountsChanged', (a) => { wallet.address = a[0] || null; if (!wallet.address) disconnectWallet(); else refreshBalances().then(renderWallet); });
-    window.ethereum.on?.('chainChanged', (c) => { wallet.chainId = c; refreshBalances().then(renderWallet); });
-    await refreshBalances();
-    renderWallet();
-  } catch (e) { console.error('connect rejected', e); renderWallet(); }
+// ---------------- render: groups ----------------
+function renderGroups() {
+  document.getElementById('groups').innerHTML = GROUPS.map(([g, rows]) => `
+    <div class="group">
+      <h3>Group ${g}</h3>
+      <div class="grp-head"><span>Team</span><span>W</span><span>D</span><span>L</span><span>Pts</span></div>
+      ${rows.map(t => `
+        <div class="grp-row">
+          <div class="grp-team">${crest(t[0], 40)}<span>${t[0]}</span></div>
+          <span>${t[1]}</span><span>${t[2]}</span><span>${t[3]}</span><span class="pts">${t[4]}</span>
+        </div>`).join('')}
+    </div>`).join('');
 }
-function toUnits(amount, dec) { const [i, f = ''] = String(amount).split('.'); const frac = (f + '0'.repeat(dec)).slice(0, dec); return BigInt(i || '0') * 10n ** BigInt(dec) + BigInt(frac || '0'); }
-function fromUnits(hex, dec) { try { return Number(BigInt(hex)) / 10 ** dec; } catch (e) { return 0; } }
-async function refreshBalances() {
-  if (!wallet.address) return;
-  try { wallet.native = fromUnits(await window.ethereum.request({ method: 'eth_getBalance', params: [wallet.address, 'latest'] }), 18); } catch (e) { wallet.native = 0; }
-  const tok = USDT[wallet.chainId]; wallet.usdt = 0;
-  if (tok) { try { const data = '0x70a08231' + '000000000000000000000000' + wallet.address.slice(2); wallet.usdt = fromUnits(await window.ethereum.request({ method: 'eth_call', params: [{ to: tok.addr, data }, 'latest'] }), tok.dec); } catch (e) { wallet.usdt = 0; } }
+
+// ---------------- render: golden leaders ----------------
+function renderGolden() {
+  document.getElementById('golden').innerHTML = GOLDEN.map((g, i) => `
+    <div class="gold-card"><div class="gold-inner"><div class="gold-bar">
+      <span class="gold-name">${g[0]} <small style="color:#cda">· ${g[1]}</small></span>
+      <span style="display:flex;align-items:center"><span class="gold-pct">${g[2]}%</span>
+      <span class="gold-yn"><button class="yn-s y" onclick="openAward(${i},'y')">YES</button><button class="yn-s n" onclick="openAward(${i},'n')">NO</button></span></span>
+    </div></div></div>`).join('');
 }
-async function sendUsdt() {
-  const to = document.getElementById('wm-to').value.trim();
-  const amount = parseFloat(document.getElementById('wm-amount').value);
-  const status = document.getElementById('wm-tx');
-  if (!/^0x[a-fA-F0-9]{40}$/.test(to)) { status.textContent = t('wm.needAddr'); return; }
-  const tok = USDT[wallet.chainId]; if (!tok) { status.textContent = t('wm.unsupported'); return; }
-  if (!(amount > 0)) return;
-  const units = toUnits(amount, tok.dec).toString(16).padStart(64, '0');
-  const data = '0xa9059cbb' + '000000000000000000000000' + to.slice(2) + units;
-  status.textContent = t('wm.sending');
-  try {
-    const txHash = await window.ethereum.request({ method: 'eth_sendTransaction', params: [{ from: wallet.address, to: tok.addr, data }] });
-    const ex = wallet.chainId === '0x1' ? 'https://etherscan.io/tx/' : wallet.chainId === '0x38' ? 'https://bscscan.com/tx/' : 'https://polygonscan.com/tx/';
-    status.innerHTML = `${t('wm.sent')} <a href="${ex}${txHash}" target="_blank" rel="noopener">${txHash.slice(0, 12)}…</a>`;
-    setTimeout(() => refreshBalances().then(renderWallet), 4000);
-  } catch (e) { console.error(e); status.textContent = t('wm.failed'); }
+
+// ---------------- render: games list ----------------
+let gameTab = 'games';
+function renderGames() {
+  const el = document.getElementById('games-list');
+  el.innerHTML = state.fixtures.map(m => {
+    const live = ['1H','2H','HT'].includes(m.status);
+    const done = ['FT','AET','PEN'].includes(m.status);
+    const when = live ? `${m.minute}'` : done ? 'FT' : m.when;
+    return `
+    <div class="grow">
+      <div class="grow-top">
+        <span class="grow-ball">26</span>
+        <span class="grow-title">${m.home} vs. ${m.away}</span>
+        <span class="grow-yield">⚡ Yield</span>
+      </div>
+      <div class="grow-probs">
+        ${crest(m.home, 40)}
+        <span class="pp home">${cent(m.probs.h)}%</span><span class="pp mut">${cent(m.probs.d)}%</span><span class="pp mut">${cent(m.probs.a)}%</span>
+        ${crest(m.away, 40)}
+      </div>
+      <div class="grow-outs">
+        <button class="out-btn home" onclick="openTrade('${m.id}','h')">${tla(m.home)}</button>
+        <button class="out-btn draw" onclick="openTrade('${m.id}','d')">DRAW</button>
+        <button class="out-btn away" onclick="openTrade('${m.id}','a')" style="background:var(--red);color:#fff;border:none">${tla(m.away)}</button>
+      </div>
+      <div class="grow-foot"><span class="pp-rate"><span class="star">★★★</span></span><span>📊 $${m.vol}K · ${when}</span></div>
+    </div>`;
+  }).join('');
 }
-function disconnectWallet() { wallet.address = null; wallet.chainId = null; wallet.native = 0; wallet.usdt = 0; renderWallet(); }
-function shortAddr(a) { return a ? a.slice(0, 6) + '…' + a.slice(-4) : ''; }
-function renderWallet() {
-  const body = document.getElementById('wallet-body');
-  if (!wallet.address) {
-    if (!hasProvider()) { body.innerHTML = `<p class="wallet-warn">${t('wm.noWallet')}</p><a class="modal-cta" href="https://metamask.io/download/" target="_blank" rel="noopener" style="display:block;text-align:center;margin-top:14px;">${t('wm.install')}</a>`; return; }
-    body.innerHTML = `
-      <button class="wallet-opt" onclick="connectWallet()"><span class="wo-ic">🦊</span><span><span class="wo-name">MetaMask / EVM</span><br><span class="wo-sub">${t('wm.metamask')}</span></span></button>
-      <button class="wallet-opt" onclick="connectWallet()"><span class="wo-ic">🔗</span><span><span class="wo-name">WalletConnect</span><br><span class="wo-sub">${t('wm.wc')}</span></span></button>`;
-    return;
-  }
-  const netName = NET_NAMES[wallet.chainId] || ('Chain ' + parseInt(wallet.chainId, 16));
-  body.innerHTML = `
-    <div class="wallet-info">
-      <div class="wi-row"><span class="k">${t('wm.address')}</span><span class="v">${shortAddr(wallet.address)}</span></div>
-      <div class="wi-row"><span class="k">${t('wm.network')}</span><span class="v wi-net"><span class="dot"></span>${netName}</span></div>
-      <div class="wi-row"><span class="k">${t('wm.native')}</span><span class="v">${wallet.native.toFixed(4)}</span></div>
-      <div class="wi-row"><span class="k">${t('wm.usdt')}</span><span class="v big">${wallet.usdt.toFixed(2)} USDT</span></div>
-    </div>
-    <h4 style="font-size:13px;margin-bottom:10px;color:var(--muted);">${t('wm.deposit')}</h4>
-    <div class="field"><label>${t('wm.to')}</label><input id="wm-to" class="mono" placeholder="0x…" /></div>
-    <div class="field"><label>${t('wm.amount')}</label><input id="wm-amount" type="number" min="0" step="0.01" placeholder="10.00" /></div>
-    <button class="modal-cta" onclick="sendUsdt()">${t('wm.send')}</button>
-    <button class="modal-cta ghost" onclick="disconnectWallet()">${t('wm.disconnect')}</button>
-    <p class="wallet-warn">${t('wm.warn')}</p>
-    <p class="tx-status" id="wm-tx"></p>`;
+document.addEventListener('click', (e) => {
+  const tab = e.target.closest('.game-tab');
+  if (tab) { document.querySelectorAll('.game-tab').forEach(t => t.classList.remove('active')); tab.classList.add('active'); gameTab = tab.dataset.tab; }
+});
+
+// ---------------- date tabs ----------------
+function renderDateTabs() {
+  const el = document.getElementById('date-tabs'); const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const now = new Date(); let html = '';
+  for (let i = 0; i < 7; i++) { const d = new Date(now); d.setDate(now.getDate() + i);
+    html += `<button class="date-tab${i === 0 ? ' active' : ''}" onclick="pickDate(this)"><div class="dt-d">${days[d.getDay()]}</div><div class="dt-n">${String(d.getDate()).padStart(2,'0')}</div></button>`; }
+  el.innerHTML = html;
 }
-function openWallet() { renderWallet(); document.getElementById('wallet-modal').classList.add('open'); }
+function pickDate(b) { document.querySelectorAll('.date-tab').forEach(t => t.classList.remove('active')); b.classList.add('active'); }
+
+// ---------------- countdown ----------------
+let cd = { d: 6, h: 13, m: 22, s: 4 };
+function tickCountdown() {
+  cd.s--; if (cd.s < 0) { cd.s = 59; cd.m--; } if (cd.m < 0) { cd.m = 59; cd.h--; } if (cd.h < 0) { cd.h = 23; cd.d--; } if (cd.d < 0) cd = { d: 0, h: 0, m: 0, s: 0 };
+  const p = (n) => String(n).padStart(2, '0');
+  document.getElementById('cd-d').textContent = p(cd.d); document.getElementById('cd-h').textContent = p(cd.h);
+  document.getElementById('cd-m').textContent = p(cd.m); document.getElementById('cd-s').textContent = p(cd.s);
+}
+
+// ============================================================
+//  Trading (bottom sheet) + portfolio
+// ============================================================
+const positions = [];
+let trade = { id: null, out: null, side: 'yes', amount: 25 };
+const OUT_LABEL = { h: 'home', d: 'draw', a: 'away' };
+function outName(m, out) { return out === 'd' ? 'Draw' : (out === 'h' ? m.home : m.away); }
+function yesProb(m, out) { return out === 'h' ? m.probs.h : out === 'd' ? m.probs.d : m.probs.a; }
+
+function openTrade(id, out) {
+  const m = MARKETS[id]; if (!m) return;
+  trade = { id, out, side: 'yes', amount: trade.amount || 25 };
+  renderTrade(); document.getElementById('trade-sheet').classList.add('open');
+}
+function openAward(i, side) {
+  const g = GOLDEN[i];
+  trade = { award: i, id: 'award' + i, out: 'y', side, amount: trade.amount || 25, awardProb: g[2] / 100, awardName: g[0], awardDesc: g[1] };
+  renderTrade(); document.getElementById('trade-sheet').classList.add('open');
+}
+function setSide(s) { trade.side = s; renderTrade(); }
+function setAmt(v) { trade.amount = v; renderTrade(); }
+function readAmt() { const el = document.getElementById('amt'); if (el) trade.amount = parseFloat(el.value) || 0; }
+function closeSheet() { document.getElementById('trade-sheet').classList.remove('open'); }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 
-// ============================================================
-//  Aggressive paywall — pops on every interaction until subscribed
-// ============================================================
-let hasAccess = false, selectedPlan = 'month', payMethod = 'card';
-const PLAN_MS = { day: 864e5, month: 30 * 864e5, year: 365 * 864e5 };
-function checkAccess() { try { const a = JSON.parse(localStorage.getItem('bb_access') || 'null'); return !!(a && a.exp && Date.now() < a.exp); } catch (e) { return false; } }
-function openPaywall() { document.getElementById('paywall').classList.add('open'); }
-function closePaywall() { document.getElementById('paywall').classList.remove('open'); }
-function selectPlan(el) { document.querySelectorAll('.pw-plan').forEach(p => p.classList.remove('active')); el.classList.add('active'); selectedPlan = el.dataset.plan; }
-function selectPay(el) { document.querySelectorAll('.pw-pay-tab').forEach(p => p.classList.remove('active')); el.classList.add('active'); payMethod = el.dataset.pay; document.getElementById('pw-cta').textContent = payMethod === 'crypto' ? t('pw.ctaCrypto') : t('pw.cta'); }
-function grantAccess() { const exp = Date.now() + (PLAN_MS[selectedPlan] || PLAN_MS.month); try { localStorage.setItem('bb_access', JSON.stringify({ plan: selectedPlan, method: payMethod, exp })); } catch (e) {} hasAccess = true; closePaywall(); }
-async function submitPaywall() {
-  const cta = document.getElementById('pw-cta');
-  if (payMethod === 'crypto') { if (!wallet.address) { await connectWallet(); if (!wallet.address) { document.getElementById('pw-note').textContent = t('pw.connectFirst'); return; } } }
-  cta.textContent = t('pw.processing'); cta.disabled = true;
-  setTimeout(() => { grantAccess(); cta.disabled = false; cta.textContent = t('pw.cta'); }, 900);
+function renderTrade() {
+  const el = document.getElementById('trade-body');
+  let q, match, yp;
+  if (trade.award != null) { q = trade.awardName; match = trade.awardDesc; yp = trade.awardProb; }
+  else { const m = MARKETS[trade.id]; q = outName(m, trade.out); match = `${m.home} vs. ${m.away}`; yp = yesProb(m, trade.out); }
+  const price = trade.side === 'yes' ? yp : (1 - yp);
+  const amt = trade.amount || 0; const shares = price > 0 ? amt / price : 0;
+  el.innerHTML = `
+    <div class="trade-mkt"><div class="tm-q">${q}</div><div class="tm-match">${match}</div></div>
+    <div class="yn">
+      <button class="yn-btn yes${trade.side === 'yes' ? ' on' : ''}" onclick="setSide('yes')">YES<b>${cent(yp)}¢</b></button>
+      <button class="yn-btn no${trade.side === 'no' ? ' on' : ''}" onclick="setSide('no')">NO<b>${cent(1 - yp)}¢</b></button>
+    </div>
+    <div class="amt-row"><label>Amount (US$)</label><input id="amt" value="${amt.toFixed(2)}" oninput="readAmt();renderTrade()" /></div>
+    <div class="presets">
+      <button class="preset" onclick="setAmt(10)">$10</button><button class="preset" onclick="setAmt(25)">$25</button>
+      <button class="preset" onclick="setAmt(50)">$50</button><button class="preset" onclick="setAmt(100)">$100</button>
+    </div>
+    <div class="t-summary"><span>Shares</span><span class="v">${shares.toFixed(1)}</span></div>
+    <div class="t-summary"><span>Avg price</span><span class="v">${cent(price)}¢</span></div>
+    <div class="t-summary big"><span>Max payout</span><span class="v">$${shares.toFixed(2)}</span></div>
+    <button class="buy-btn ${trade.side === 'no' ? 'no' : ''}" onclick="buy()" ${amt <= 0 || amt > state.balance ? 'disabled' : ''}>
+      Buy ${trade.side === 'yes' ? 'YES' : 'NO'} · ${cent(price)}¢</button>`;
 }
-function installPaywallGate() {
-  document.addEventListener('click', (e) => {
-    if (hasAccess) return;
-    const pw = document.getElementById('paywall');
-    if (pw && pw.contains(e.target)) return;
-    e.preventDefault(); e.stopPropagation(); openPaywall();
-  }, true);
+function buy() {
+  let q, match, yp, id = trade.id;
+  if (trade.award != null) { q = trade.awardName; match = trade.awardDesc; yp = trade.awardProb; }
+  else { const m = MARKETS[trade.id]; q = outName(m, trade.out); match = `${m.home} vs. ${m.away}`; yp = yesProb(m, trade.out);
+    const delta = 0.0008 * (trade.amount || 0) * (trade.side === 'yes' ? 1 : -1);
+    const key = trade.out === 'h' ? 'h' : trade.out === 'd' ? 'd' : 'a';
+    m.probs[key] = Math.max(0.01, m.probs[key] + delta); m.probs = normalize(m.probs); }
+  const price = trade.side === 'yes' ? yp : (1 - yp);
+  const amt = trade.amount || 0; if (amt <= 0 || amt > state.balance || price <= 0.01 || price >= 0.99) return;
+  positions.push({ id, side: trade.side, shares: amt / price, cost: amt, avg: price, label: q, match });
+  state.balance -= amt;
+  updateFab(); renderCards(); renderGames(); renderPositions(); closeSheet();
+}
+function renderPositions() {
+  const el = document.getElementById('pos-body');
+  if (!positions.length) { el.innerHTML = `<div class="empty-s">No open positions yet. Tap a market to trade.</div>`; return; }
+  el.innerHTML = positions.map((q, i) => {
+    const value = q.shares * q.avg; const pl = 0;
+    return `<div class="pos-card"><div class="pos-top">
+      <div><div class="pos-name">${q.side === 'no' ? 'NO · ' : ''}${q.label}</div><div class="pos-match">${q.match}</div></div>
+      <button class="pos-rm" onclick="closePos(${i})">×</button></div>
+      <div class="pos-stats"><span>${q.shares.toFixed(1)} shares @ ${cent(q.avg)}¢</span>
+      <span class="pos-val pos">$${value.toFixed(2)} <em>+0.00</em></span></div></div>`;
+  }).join('');
+}
+function closePos(i) { const q = positions[i]; if (!q) return; state.balance += q.shares * q.avg; positions.splice(i, 1); updateFab(); renderPositions(); }
+function updateFab() {
+  document.getElementById('fab-bal').textContent = '$' + Math.round(state.balance);
+  document.getElementById('fab-pos').textContent = positions.length;
+}
+function openPortfolio() { renderPositions(); document.getElementById('port-sheet').classList.add('open'); }
+
+// ============================================================
+//  Crypto wallet (EIP-1193) — Sign Up / Connect
+// ============================================================
+const USDT = { '0x1': { addr:'0xdAC17F958D2ee523a2206206994597C13D831ec7', dec:6, name:'Ethereum' },
+  '0x38': { addr:'0x55d398326f99059fF775485246999027B3197955', dec:18, name:'BNB Chain' },
+  '0x89': { addr:'0xc2132D05D31c914a87C6611C10748AEb04B58e8F', dec:6, name:'Polygon' } };
+const NET = { '0x1':'Ethereum','0x38':'BNB Chain','0x89':'Polygon','0xa':'Optimism','0x2105':'Base' };
+const wallet = { address: null, chainId: null, native: 0, usdt: 0 };
+const fromU = (hex, d) => { try { return Number(BigInt(hex)) / 10 ** d; } catch (e) { return 0; } };
+function openWallet() { renderWallet(); document.getElementById('wallet-modal').classList.add('open'); }
+async function connectWallet() {
+  if (typeof window.ethereum === 'undefined') { renderWallet(); return; }
+  try {
+    const a = await window.ethereum.request({ method: 'eth_requestAccounts' });
+    wallet.address = a[0]; wallet.chainId = await window.ethereum.request({ method: 'eth_chainId' });
+    await refreshBal(); renderWallet();
+  } catch (e) { console.error(e); }
+}
+async function refreshBal() {
+  if (!wallet.address) return;
+  try { wallet.native = fromU(await window.ethereum.request({ method:'eth_getBalance', params:[wallet.address,'latest'] }), 18); } catch (e) {}
+  const t = USDT[wallet.chainId]; wallet.usdt = 0;
+  if (t) { try { const data='0x70a08231'+'000000000000000000000000'+wallet.address.slice(2);
+    wallet.usdt = fromU(await window.ethereum.request({ method:'eth_call', params:[{to:t.addr,data},'latest'] }), t.dec); } catch (e) {} }
+}
+function shortA(a) { return a ? a.slice(0,6)+'…'+a.slice(-4) : ''; }
+function renderWallet() {
+  const el = document.getElementById('wallet-body');
+  if (!wallet.address) {
+    if (typeof window.ethereum === 'undefined') {
+      el.innerHTML = `<p class="wallet-warn">No wallet detected. Install MetaMask to continue.</p>
+        <a class="modal-cta" href="https://metamask.io/download/" target="_blank" rel="noopener" style="display:block;text-align:center">Install MetaMask</a>`;
+      return;
+    }
+    el.innerHTML = `<button class="wallet-opt" onclick="connectWallet()"><span class="wo-ic">🦊</span><span><span class="wo-name">MetaMask / EVM</span><br><span class="wo-sub">Browser wallet</span></span></button>
+      <button class="wallet-opt" onclick="connectWallet()"><span class="wo-ic">🔗</span><span><span class="wo-name">WalletConnect</span><br><span class="wo-sub">Scan with your app</span></span></button>`;
+    return;
+  }
+  el.innerHTML = `<div class="wallet-info">
+    <div class="wi-row"><span class="k">Address</span><span class="v">${shortA(wallet.address)}</span></div>
+    <div class="wi-row"><span class="k">Network</span><span class="v">${NET[wallet.chainId] || 'Chain ' + parseInt(wallet.chainId, 16)}</span></div>
+    <div class="wi-row"><span class="k">Native</span><span class="v">${wallet.native.toFixed(4)}</span></div>
+    <div class="wi-row"><span class="k">USDT</span><span class="v big">${wallet.usdt.toFixed(2)}</span></div></div>
+    <p class="wallet-warn">Real on-chain balance. Deposits are user-signed to an address you control — this demo holds no custody.</p>
+    <button class="modal-cta ghost" onclick="wallet.address=null;renderWallet()">Disconnect</button>`;
 }
 
 // ---------------- boot ----------------
 function boot() {
-  try { lang = localStorage.getItem('bb_lang') || 'pt'; } catch (e) { lang = 'pt'; }
-  document.documentElement.lang = lang === 'pt' ? 'pt-BR' : 'en';
-  applyI18n();
-  updateBalance();
-  loadFixtures('71');
-  renderTrade();
+  renderDateTabs();
+  renderWinners();
+  renderGroups();
+  renderGolden();
   renderPositions();
-  hasAccess = checkAccess();
-  installPaywallGate();
-  if (!hasAccess) openPaywall();
+  updateFab();
+  loadMarkets();
+  tickCountdown(); setInterval(tickCountdown, 1000);
+  // close sheets on overlay click
+  document.querySelectorAll('.sheet-overlay').forEach(o => o.addEventListener('click', (e) => { if (e.target === o) o.classList.remove('open'); }));
 }
+function flagMock() { let b = document.getElementById('mock-bar'); if (!b) { b = document.createElement('div'); b.id = 'mock-bar'; document.querySelector('.app').prepend(b); } b.textContent = '⚠️ Showing a sample WC slate — live ESPN World Cup data appears here during the tournament.'; }
+function clearMock() { const b = document.getElementById('mock-bar'); if (b) b.remove(); }
 document.addEventListener('DOMContentLoaded', boot);
