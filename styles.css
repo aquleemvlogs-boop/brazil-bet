@@ -37,7 +37,7 @@ img { display: block; max-width: 100%; }
 /* ---------- Top bar ---------- */
 .topbar { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; }
 .logo { font-family: 'Oxanium', sans-serif; font-weight: 800; font-size: 22px; letter-spacing: -0.5px; }
-.logo sup { font-size: 9px; color: var(--blue); font-weight: 700; vertical-align: super; }
+.logo span { color: var(--blue); }
 .top-actions { display: flex; align-items: center; gap: 10px; }
 .t-login { font-size: 13px; font-weight: 600; color: var(--text); }
 .t-signup { background: #fff; color: #0a0a0d; font-weight: 700; font-size: 13px; padding: 9px 16px; border-radius: 999px; }

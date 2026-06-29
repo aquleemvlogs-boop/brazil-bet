@@ -91,7 +91,16 @@ function seedProbs(id) {
 }
 
 const MARKETS = {};   // id -> market
-const state = { balance: 1000, fixtures: [] };
+const state = { balance: 1000, fixtures: [], selectedDate: null };
+
+// World Cup 2026 window — drives the date strip; each day is fetched live on tap.
+const WC = { start: '2026-06-11', end: '2026-07-19' };
+function ymd(d) { return '' + d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0'); }
+function tournamentDates() {
+  const out = [], s = new Date(WC.start + 'T12:00:00'), e = new Date(WC.end + 'T12:00:00');
+  for (let d = new Date(s); d <= e; d.setDate(d.getDate() + 1)) out.push(new Date(d));
+  return out;
+}
 
 function fmtWhen(d) {
   const wd = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()];
@@ -100,21 +109,26 @@ function fmtWhen(d) {
   return `${mo} ${d.getDate()} · ${h}:${String(d.getMinutes()).padStart(2,'0')}${ap}`;
 }
 
-async function loadMarkets() {
-  let markets = [];
+async function loadMarkets(dateStr) {
+  let markets = [], anchor = dateStr || null;
   try {
-    const r = await fetch('https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard');
+    const url = 'https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard' + (dateStr ? `?dates=${dateStr}` : '');
+    const r = await fetch(url);
     if (r.ok) {
       const j = await r.json();
       const evs = (j.events || []).map(shapeEspn);
-      if (evs.length) markets = evs.map(e => ({
-        id: e.id, home: e.home, away: e.away, hs: e.hs, as: e.as, status: e.status, minute: e.minute,
-        when: fmtWhen(e.when), probs: e.probs || seedProbs(e.id), vol: 80 + (parseInt(e.id.slice(-3)) || 100) % 400, real: true,
-      }));
+      if (evs.length) {
+        if (!anchor) anchor = ymd(evs[0].when);
+        markets = evs.map(e => ({
+          id: e.id, home: e.home, away: e.away, hs: e.hs, as: e.as, status: e.status, minute: e.minute,
+          when: fmtWhen(e.when), probs: e.probs || seedProbs(e.id), vol: 80 + (parseInt(e.id.slice(-3)) || 100) % 400, real: true,
+        }));
+      }
     }
-  } catch (e) { console.warn('ESPN WC unavailable, using sample slate', e); }
+  } catch (e) { console.warn('ESPN WC unavailable', e); }
 
-  if (!markets.length) {
+  // Only fall back to the sample slate on the very first load (no date chosen).
+  if (!markets.length && !dateStr) {
     markets = MOCK_MATCHES.map((m, i) => ({
       id: 'wc' + i, home: m[0], away: m[1], hs: null, as: null, status: 'NS', minute: null,
       when: m[6], probs: normalize({ h: m[2], d: m[3], a: m[4] }), vol: m[5], real: false,
@@ -126,6 +140,7 @@ async function loadMarkets() {
   markets.forEach(m => MARKETS[m.id] = m);
   renderCards();
   renderGames();
+  return anchor;
 }
 function normalize(p) { const s = p.h + p.d + p.a || 1; return { h: p.h / s, d: p.d / s, a: p.a / s }; }
 
@@ -133,7 +148,8 @@ function normalize(p) { const s = p.h + p.d + p.a || 1; return { h: p.h / s, d: 
 const cent = (x) => Math.round(x * 100);
 function renderCards() {
   const el = document.getElementById('match-cards');
-  el.innerHTML = state.fixtures.slice(0, 8).map(m => {
+  if (!state.fixtures.length) { el.innerHTML = `<div class="empty">No matches on this day — pick another date.</div>`; return; }
+  el.innerHTML = state.fixtures.slice(0, 12).map(m => {
     const live = ['1H','2H','HT'].includes(m.status);
     const hcc = CC[m.home], acc = CC[m.away];
     const artH = hcc ? `style="background-image:url('${flagURL(hcc,160)}')"` : 'style="background:#23262f"';
@@ -199,6 +215,7 @@ function renderGolden() {
 let gameTab = 'games';
 function renderGames() {
   const el = document.getElementById('games-list');
+  if (!state.fixtures.length) { el.innerHTML = `<div class="empty">No matches on this day.</div>`; return; }
   el.innerHTML = state.fixtures.map(m => {
     const live = ['1H','2H','HT'].includes(m.status);
     const done = ['FT','AET','PEN'].includes(m.status);
@@ -230,14 +247,21 @@ document.addEventListener('click', (e) => {
 });
 
 // ---------------- date tabs ----------------
-function renderDateTabs() {
+function renderDateTabs(activeYmd) {
   const el = document.getElementById('date-tabs'); const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-  const now = new Date(); let html = '';
-  for (let i = 0; i < 7; i++) { const d = new Date(now); d.setDate(now.getDate() + i);
-    html += `<button class="date-tab${i === 0 ? ' active' : ''}" onclick="pickDate(this)"><div class="dt-d">${days[d.getDay()]}</div><div class="dt-n">${String(d.getDate()).padStart(2,'0')}</div></button>`; }
-  el.innerHTML = html;
+  el.innerHTML = tournamentDates().map(d => {
+    const y = ymd(d);
+    return `<button class="date-tab${y === activeYmd ? ' active' : ''}" data-ymd="${y}" onclick="pickDate('${y}',this)"><div class="dt-d">${days[d.getDay()]}</div><div class="dt-n">${String(d.getDate()).padStart(2,'0')}</div></button>`;
+  }).join('');
+  const a = el.querySelector('.date-tab.active'); if (a) a.scrollIntoView({ inline: 'center', block: 'nearest' });
 }
-function pickDate(b) { document.querySelectorAll('.date-tab').forEach(t => t.classList.remove('active')); b.classList.add('active'); }
+function pickDate(y, btn) {
+  document.querySelectorAll('.date-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  state.selectedDate = y;
+  document.getElementById('match-cards').innerHTML = `<div class="empty">Loading…</div>`;
+  loadMarkets(y);
+}
 
 // ---------------- countdown ----------------
 let cd = { d: 6, h: 13, m: 22, s: 4 };
@@ -378,13 +402,18 @@ function renderWallet() {
 
 // ---------------- boot ----------------
 function boot() {
-  renderDateTabs();
   renderWinners();
   renderGroups();
   renderGolden();
   renderPositions();
   updateFab();
-  loadMarkets();
+  // Load the current slate, anchor the calendar to it, then build the date strip.
+  loadMarkets().then(anchor => {
+    state.selectedDate = anchor || ymd(new Date());
+    renderDateTabs(state.selectedDate);
+  });
+  // Keep the selected day fresh (live scores / odds) every 30s.
+  setInterval(() => { if (state.selectedDate) loadMarkets(state.selectedDate); }, 30000);
   tickCountdown(); setInterval(tickCountdown, 1000);
   // close sheets on overlay click
   document.querySelectorAll('.sheet-overlay').forEach(o => o.addEventListener('click', (e) => { if (e.target === o) o.classList.remove('open'); }));
