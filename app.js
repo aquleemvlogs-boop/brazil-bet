@@ -4,8 +4,9 @@
    Plug in The Odds API for real market % (see ODDS_API_KEY below).
    ============================================================ */
 
-// Paste your The Odds API key here (the-odds-api.com) to use real odds → %.
-const ODDS_API_KEY = '';
+// The Odds API key (the-odds-api.com) — real match % + winner odds.
+// Note: visible in static source; fine for the free demo tier (fetched once per load).
+const ODDS_API_KEY = '042e1997257ca68f821c400123a4e2ca';
 
 // ---------------- flag + code helpers ----------------
 const CC = {
@@ -15,6 +16,9 @@ const CC = {
   'Bosnia and Herzegovina':'ba',Qatar:'qa',Scotland:'gb-sct',Haiti:'ht','United States':'us',USA:'us',Australia:'au',
   Paraguay:'py','Türkiye':'tr',Turkey:'tr',Netherlands:'nl','Saudi Arabia':'sa',Ecuador:'ec',Uruguay:'uy',
   Japan:'jp',Senegal:'sn',Nigeria:'ng',Egypt:'eg',Italy:'it',Norway:'no',Denmark:'dk',Poland:'pl',Austria:'at',
+  // The Odds API name variants
+  'South Korea':'kr','United States':'us','Ivory Coast':'ci','Czech Republic':'cz',Turkey:'tr',Wales:'gb-wls',
+  Algeria:'dz',Iran:'ir',Tunisia:'tn',Cameroon:'cm',Peru:'pe',Chile:'cl','Costa Rica':'cr',Ghana:'gh',
 };
 const TLA = {
   Croatia:'HRV',Ghana:'GHA',Panama:'PAN',England:'ENG',Colombia:'COL',Portugal:'PRT','DR Congo':'CDR',
@@ -93,6 +97,46 @@ function seedProbs(id) {
 const MARKETS = {};   // id -> market
 const state = { balance: 1000, fixtures: [], selectedDate: null };
 
+// ---------------- The Odds API (real market odds, fetched once per load) ----------------
+const ODDS = {};           // "home|away" (normalized) -> {h,d,a} de-vigged probability
+let WINNERS_REAL = null;   // [[team, pct], ...] for the winner grid
+const ALIAS = { 'united states':'usa', 'south korea':'korea republic', 'turkiye':'turkey', 'czech republic':'czechia', 'ivory coast':"cote d'ivoire" };
+function norm(n) { let s = String(n).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim(); return ALIAS[s] || s; }
+function oddsProbs(home, away) {
+  const k = norm(home) + '|' + norm(away); if (ODDS[k]) return ODDS[k];
+  const r = norm(away) + '|' + norm(home); if (ODDS[r]) { const o = ODDS[r]; return { h: o.a, d: o.d, a: o.h }; }
+  return null;
+}
+async function loadOdds() {
+  if (!ODDS_API_KEY) return;
+  try {
+    const r = await fetch(`https://api.the-odds-api.com/v4/sports/soccer_fifa_world_cup/odds?apiKey=${ODDS_API_KEY}&regions=eu&markets=h2h&oddsFormat=decimal`);
+    if (r.ok) {
+      const data = await r.json();
+      (Array.isArray(data) ? data : []).forEach(m => {
+        const bk = (m.bookmakers || [])[0]; if (!bk) return;
+        const out = ((bk.markets || []).find(x => x.key === 'h2h') || {}).outcomes || [];
+        const price = (nm) => (out.find(o => norm(o.name) === norm(nm)) || {}).price;
+        const hp = price(m.home_team), ap = price(m.away_team), dp = (out.find(o => /draw/i.test(o.name)) || {}).price;
+        if (hp && ap) { const ih = 1 / hp, id = 1 / (dp || 50), ia = 1 / ap, s = ih + id + ia;
+          ODDS[norm(m.home_team) + '|' + norm(m.away_team)] = { h: ih / s, d: id / s, a: ia / s }; }
+      });
+    }
+  } catch (e) { console.warn('odds h2h failed', e); }
+  try {
+    const r = await fetch(`https://api.the-odds-api.com/v4/sports/soccer_fifa_world_cup_winner/odds?apiKey=${ODDS_API_KEY}&regions=eu&markets=outrights&oddsFormat=decimal`);
+    if (r.ok) {
+      const data = await r.json(); const m = (Array.isArray(data) ? data : [])[0];
+      const bk = (m && m.bookmakers || [])[0];
+      const out = ((bk && bk.markets || []).find(x => x.key === 'outrights') || {}).outcomes || [];
+      if (out.length) {
+        const inv = out.map(o => ({ n: o.name, p: 1 / o.price })); const s = inv.reduce((a, x) => a + x.p, 0);
+        WINNERS_REAL = inv.map(x => [x.n, Math.round(x.p / s * 100)]).sort((a, b) => b[1] - a[1]).slice(0, 24);
+      }
+    }
+  } catch (e) { console.warn('odds winner failed', e); }
+}
+
 // World Cup 2026 window — drives the date strip; each day is fetched live on tap.
 const WC = { start: '2026-06-11', end: '2026-07-19' };
 function ymd(d) { return '' + d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0'); }
@@ -121,7 +165,7 @@ async function loadMarkets(dateStr) {
         if (!anchor) anchor = ymd(evs[0].when);
         markets = evs.map(e => ({
           id: e.id, home: e.home, away: e.away, hs: e.hs, as: e.as, status: e.status, minute: e.minute,
-          when: fmtWhen(e.when), probs: e.probs || seedProbs(e.id), vol: 80 + (parseInt(e.id.slice(-3)) || 100) % 400, real: true,
+          when: fmtWhen(e.when), probs: oddsProbs(e.home, e.away) || e.probs || seedProbs(e.id), vol: 80 + (parseInt(e.id.slice(-3)) || 100) % 400, real: true,
         }));
       }
     }
@@ -182,7 +226,7 @@ function renderCards() {
 
 // ---------------- render: winner grid ----------------
 function renderWinners() {
-  document.getElementById('winner-grid').innerHTML = WINNERS.map(w => `
+  document.getElementById('winner-grid').innerHTML = (WINNERS_REAL || WINNERS).map(w => `
     <div class="win-cell">${crest(w[0], 80)}<span class="wp">${w[1]}%</span></div>`).join('')
     .replace(/class="crest"/g, 'class="crest" style="width:100%;aspect-ratio:1;border-radius:7px"');
 }
@@ -407,12 +451,13 @@ function boot() {
   renderGolden();
   renderPositions();
   updateFab();
-  // Load the current slate, anchor the calendar to it, then build the date strip.
+  // Load the current slate, anchor the calendar, then fetch real odds once and re-render.
   loadMarkets().then(anchor => {
     state.selectedDate = anchor || ymd(new Date());
     renderDateTabs(state.selectedDate);
+    loadOdds().then(() => { renderWinners(); loadMarkets(state.selectedDate); });
   });
-  // Keep the selected day fresh (live scores / odds) every 30s.
+  // Keep the selected day fresh (live scores) every 30s — reuses cached odds, no extra Odds-API calls.
   setInterval(() => { if (state.selectedDate) loadMarkets(state.selectedDate); }, 30000);
   tickCountdown(); setInterval(tickCountdown, 1000);
   // close sheets on overlay click
